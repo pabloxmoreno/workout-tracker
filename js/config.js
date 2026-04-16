@@ -1,46 +1,13 @@
-export const EXERCISES = [
-    { id: 'e1', name: 'Wyciskanie sztangi leżąc', muscleGroup: 'klatka' },
-    { id: 'e2', name: 'Wyciskanie hantli na skosie', muscleGroup: 'klatka' },
-    { id: 'e3', name: 'Pompki na poręczach', muscleGroup: 'klatka' },
-    { id: 'e4', name: 'Rozpiętki z hantlami', muscleGroup: 'klatka' },
-    { id: 'e5', name: 'Butterfly (Maszyna)', muscleGroup: 'klatka' },
-    { id: 'e6', name: 'Podciąganie na drążku', muscleGroup: 'plecy' },
-    { id: 'e7', name: 'Martwy ciąg', muscleGroup: 'plecy' },
-    { id: 'e8', name: 'Wiosłowanie sztangą w opadzie', muscleGroup: 'plecy' },
-    { id: 'e9', name: 'Przyciąganie linki wyciągu górnego', muscleGroup: 'plecy' },
-    { id: 'e10', name: 'Wiosłowanie hantlem jednorącz', muscleGroup: 'plecy' },
-    { id: 'e11', name: 'Przysiad ze sztangą', muscleGroup: 'nogi' },
-    { id: 'e12', name: 'Wypychanie na suwnicy', muscleGroup: 'nogi' },
-    { id: 'e13', name: 'Prostowanie nóg na maszynie', muscleGroup: 'nogi' },
-    { id: 'e14', name: 'Uginanie nóg na maszynie', muscleGroup: 'nogi' },
-    { id: 'e15', name: 'Wspięcia na łydki stojąc', muscleGroup: 'nogi' },
-    { id: 'e16', name: 'Wykroki z hantlami', muscleGroup: 'nogi' },
-    { id: 'e17', name: 'Wyciskanie żołnierskie', muscleGroup: 'barki' },
-    { id: 'e18', name: 'Wznosy hantli bokiem', muscleGroup: 'barki' },
-    { id: 'e19', name: 'Wznosy hantli przodem', muscleGroup: 'barki' },
-    { id: 'e20', name: 'Face Pulls', muscleGroup: 'barki' },
-    { id: 'e21', name: 'Wyciskanie hantli siedząc', muscleGroup: 'barki' },
-    { id: 'e22', name: 'Uginanie ramion ze sztangą', muscleGroup: 'biceps' },
-    { id: 'e23', name: 'Uginanie hantli z supinacją', muscleGroup: 'biceps' },
-    { id: 'e24', name: 'Modlitewnik', muscleGroup: 'biceps' },
-    { id: 'e25', name: 'Uginanie młotkowe', muscleGroup: 'biceps' },
-    { id: 'e26', name: 'Wyciskanie francuskie', muscleGroup: 'triceps' },
-    { id: 'e27', name: 'Prostowanie ramion na wyciągu', muscleGroup: 'triceps' },
-    { id: 'e28', name: 'Pompki wąsko', muscleGroup: 'triceps' },
-    { id: 'e29', name: 'Dipy międzyławeczkowe', muscleGroup: 'triceps' },
-    { id: 'e30', name: 'Plank', muscleGroup: 'core' },
-    { id: 'e31', name: 'Brzuszki klasyczne', muscleGroup: 'core' },
-    { id: 'e32', name: 'Wznosy nóg w zwisie', muscleGroup: 'core' },
-    { id: 'e33', name: 'Russian Twist', muscleGroup: 'core' },
-    { id: 'e34', name: 'Mountain Climbers', muscleGroup: 'core' },
-    { id: 'e35', name: 'Hip Thrust', muscleGroup: 'posladki' },
-    { id: 'e36', name: 'Odwodzenie nogi w tył', muscleGroup: 'posladki' },
-    { id: 'e37', name: 'Glute Bridge', muscleGroup: 'posladki' },
-    { id: 'e38', name: 'Bieżnia (Czas min)', muscleGroup: 'cardio', isCardio: true },
-    { id: 'e39', name: 'Rower stacjonarny', muscleGroup: 'cardio', isCardio: true },
-    { id: 'e40', name: 'Skakanka', muscleGroup: 'cardio', isCardio: true },
-    { id: 'e41', name: 'Rolowanie powięziowe', muscleGroup: 'mobilnosc' },
-    { id: 'e42', name: 'Rozciąganie statyczne', muscleGroup: 'mobilnosc' }
-];
+// Konfiguracja aplikacji
+const APP_CONFIG = {
+    STORAGE_KEY: 'secure_exercise_tracker_data',
+    MAX_EXERCISES: 100,
+    DEFAULT_EXERCISES: [
+        { id: 1, name: 'Pompki', sets: 3, reps: 15 },
+        { id: 2, name: 'Przysiady', sets: 4, reps: 12 },
+        { id: 3, name: 'Podciąganie', sets: 3, reps: 8 }
+    ]
+};
 
-export const MUSCLE_GROUPS = ['wszystkie', 'klatka', 'plecy', 'nogi', 'barki', 'biceps', 'triceps', 'core', 'posladki', 'cardio', 'mobilnosc'];
+// Eksport dla innych modułów (w środowisku bez bundlera używamy obiektu globalnego lub window)
+window.APP_CONFIG = APP_CONFIG;
