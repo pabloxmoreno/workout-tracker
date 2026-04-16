@@ -1,117 +1,105 @@
-import store from './store.js';
-import ui from './ui.js';
-import { EXERCISES } from './config.js';
-import { showToast } from './utils.js';
+const App = {
+    exercises: [],
 
-class App {
-    constructor() {
-        this.currentView = 'calendar';
-        this.pendingExerciseAdd = null;
+    init: () => {
+        // Inicjalizacja modułów
+        UI.init();
         
-        this.init();
-    }
+        // Ładowanie danych
+        App.loadExercises();
+        
+        // Nasłuchiwanie zdarzeń
+        App.attachEventListeners();
+    },
 
-    init() {
-        // Inicjalizacja motywu
-        if (store.settings.darkMode) {
-            document.body.classList.add('dark-mode');
+    loadExercises: () => {
+        const stored = Utils.loadFromStorage(APP_CONFIG.STORAGE_KEY);
+        
+        if (stored && Array.isArray(stored)) {
+            App.exercises = stored;
+        } else {
+            // Jeśli brak danych, ładujemy domyślne
+            App.exercises = [...APP_CONFIG.DEFAULT_EXERCISES];
+            App.saveExercises();
+        }
+        
+        App.render();
+    },
+
+    saveExercises: () => {
+        if (App.exercises.length > APP_CONFIG.MAX_EXERCISES) {
+            alert('Osiągnięto maksymalną liczbę ćwiczeń.');
+            App.exercises = App.exercises.slice(0, APP_CONFIG.MAX_EXERCISES);
+        }
+        Utils.saveToStorage(APP_CONFIG.STORAGE_KEY, App.exercises);
+    },
+
+    addExercise: (data) => {
+        const validation = Utils.validateExercise(data);
+        
+        if (!validation.isValid) {
+            UI.showErrors(validation.errors);
+            return false;
         }
 
-        // Event Delegation dla Nawigacji
-        document.querySelector('.bottom-nav').addEventListener('click', (e) => {
-            const navItem = e.target.closest('.nav-item');
-            if (navItem) {
-                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-                navItem.classList.add('active');
-                this.navigate(navItem.dataset.view);
-            }
-        });
+        const newExercise = {
+            id: Utils.generateId(),
+            name: data.name,
+            sets: data.sets,
+            reps: data.reps,
+            createdAt: new Date().toISOString()
+        };
 
-        // Rejestracja Service Workera
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('SW zarejestrowany'))
-                .catch(err => console.error('SW błąd:', err));
-        }
+        App.exercises.unshift(newExercise); // Dodaj na początek
+        App.saveExercises();
+        App.render();
+        UI.clearForm();
+        return true;
+    },
 
-        this.navigate('calendar');
-    }
-
-    navigate(view) {
-        this.currentView = view;
-        
-        switch(view) {
-            case 'calendar':
-                ui.renderCalendar(this);
-                break;
-            case 'log':
-                ui.renderLogForm(this);
-                break;
-            case 'stats':
-                ui.renderStats();
-                break;
-            case 'settings':
-                ui.renderSettings();
-                break;
-        }
-    }
-
-    openExerciseModal() {
-        this.pendingExerciseAdd = true;
-        ui.showModal(EXERCISES, (exercise) => {
-            ui.addExerciseToForm(exercise);
-        });
-    }
-
-    saveWorkout() {
-        const form = document.getElementById('new-workout-form');
-        if (!form) return;
-
-        const date = form.querySelector('input[name="date"]').value;
-        const exercises = [];
-        
-        form.querySelectorAll('.exercise-card').forEach(card => {
-            const sets = [];
-            card.querySelectorAll('.set-row').forEach(row => {
-                const weight = parseFloat(row.querySelector('input[name="weight"]').value);
-                const reps = parseInt(row.querySelector('input[name="reps"]').value);
-                
-                if (!isNaN(weight) && !isNaN(reps)) {
-                    sets.push({ weight, reps });
-                }
-            });
-
-            if (sets.length > 0) {
-                exercises.push({
-                    id: card.dataset.id,
-                    name: card.querySelector('.exercise-name').textContent,
-                    sets
-                });
-            }
-        });
-
-        if (exercises.length === 0) {
-            showToast('Dodaj przynajmniej jedno ćwiczenie z serią', 'error');
+    deleteExercise: (id) => {
+        if (!confirm('Czy na pewno chcesz usunąć to ćwiczenie?')) {
             return;
         }
 
-        store.addLog({
-            date,
-            exercises
+        App.exercises = App.exercises.filter(ex => ex.id !== id);
+        App.saveExercises();
+        App.render();
+    },
+
+    filterExercises: (query) => {
+        const filtered = App.exercises.filter(ex => 
+            ex.name.toLowerCase().includes(query.toLowerCase())
+        );
+        UI.renderList(filtered);
+    },
+
+    render: () => {
+        UI.renderList(App.exercises);
+    },
+
+    attachEventListeners: () => {
+        // Dodawanie ćwiczenia
+        UI.elements.form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = UI.getFormData();
+            App.addExercise(data);
         });
 
-        showToast('Trening zapisany!', 'success');
-        this.navigate('calendar');
-    }
+        // Usuwanie ćwiczenia (delegowanie zdarzeń)
+        UI.elements.list.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-delete')) {
+                const id = e.target.getAttribute('data-id');
+                App.deleteExercise(id);
+            }
+        });
 
-    toggleDetails(logId) {
-        // Implementacja rozwijania szczegółów w kalendarzu
-        // W pełnej wersji wymagałoby to dodatkowego UI w renderCalendar
-        console.log('Toggle details for:', logId);
-        showToast('Funkcja szczegółów w rozwoju', 'info');
+        // Wyszukiwanie
+        UI.elements.searchInput.addEventListener('input', (e) => {
+            App.filterExercises(e.target.value);
+        });
     }
-}
+};
 
-// Start aplikacji
-const app = new App();
-// Nie eksponujemy app globalnie: window.app = app;
+// Uruchomienie aplikacji po załadowaniu DOM
+document.addEventListener('DOMContentLoaded', App.init);
