@@ -1,5 +1,3 @@
-name=js/utils.js url=https://github.com/pabloxmoreno/workout-tracker/blob/main/js/utils.js
-
 export const utils = {
     // ✅ NOWA FUNKCJA - Bezpieczna walidacja wagi
     validateWeight(value) {
