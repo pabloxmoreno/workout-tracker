@@ -183,7 +183,7 @@ class UI {
         
         const nameSpan = document.createElement('span');
         nameSpan.className = 'exercise-name';
-        nameSpan.textContent = exercise.name; // Bezpieczne
+        nameSpan.textContent = exercise.name;
         
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
@@ -393,7 +393,7 @@ class UI {
             item.className = 'exercise-item';
             
             const name = document.createElement('span');
-            name.textContent = ex.name; // Bezpieczne
+            name.textContent = ex.name;
             
             const group = document.createElement('small');
             group.textContent = ex.muscleGroup;

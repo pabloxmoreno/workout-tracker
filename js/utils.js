@@ -28,7 +28,6 @@ export function validateImportData(data) {
         if (!log.id || !log.date || !Array.isArray(log.exercises)) {
             return false;
         }
-        // Dodatkowa walidacja pól ćwiczeń mogłaby tu być dodana
     }
     return true;
 }
