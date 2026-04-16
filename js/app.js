@@ -95,47 +95,43 @@ const app = {
     openExerciseModal() {
         this.isModalOpen = true;
         this.modalSearchQuery = '';
-        document.getElementById('exercise-modal').classList.remove('hidden');
-        document.getElementById('modal-search').value = '';
-        document.getElementById('modal-search').focus();
-        this.filterModalExercises();
+        const modal = document.getElementById('exercise-modal');
+        if(modal) {
+            modal.classList.remove('hidden');
+            const searchInput = document.getElementById('modal-search');
+            if(searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+            this.filterModalExercises();
+        }
     },
 
     closeExerciseModal() {
         this.isModalOpen = false;
-        document.getElementById('exercise-modal').classList.add('hidden');
+        const modal = document.getElementById('exercise-modal');
+        if(modal) modal.classList.add('hidden');
     },
 
     setModalFilter(group) {
         this.modalFilter = group;
         // Aktualizacja UI chipów
         const chips = document.querySelectorAll('#modal-filters .chip');
-        chips.forEach(c => {
-            if(c.textContent.toLowerCase().includes(group === 'wszystkie' ? 'wszystkie' : group)) {
-                c.classList.add('active');
-            } else {
-                // Proste sprawdzenie po tekście może być niedokładne dla skrótów, lepiej po argumencie funkcji
-                // Tutaj uproszczone: przerysowujemy filtry lub togglimy klasę ręcznie
-                // Lepsze podejście: przekaż event lub ID
-            }
-        });
-        // Poprawne przełączenie klasy active:
         chips.forEach(c => c.classList.remove('active'));
-        event.target.classList.add('active');
-
+        // Zakładamy, że event.target jest dostępny przez wywołanie z onclick
+        if(event && event.target) {
+            event.target.classList.add('active');
+        }
         this.filterModalExercises();
     },
 
     filterModalExercises() {
-        const query = (document.getElementById('modal-search')?.value || '').toLowerCase();
+        const searchInput = document.getElementById('modal-search');
+        const query = searchInput ? searchInput.value.toLowerCase() : '';
         this.modalSearchQuery = query;
 
-        let filtered = DEFAULT_EXERCISES.concat(
-            store.exercises.filter(e => e.isCustom) // Dodaj customowe, jeśli nie ma ich w default (choć store już ma wszystkie)
-        );
-        
-        // Uniknij duplikatów jeśli customowe są też w store.exercises (store.exercises zawiera już wszystko)
-        filtered = store.exercises;
+        // Pobieramy ćwiczenia ze store (zawiera domyślne + customowe)
+        let filtered = store.exercises;
 
         // Filtr grupy
         if (this.modalFilter !== 'wszystkie') {
@@ -192,7 +188,8 @@ const app = {
     removeSessionItem(idx) {
         this.tempSets.splice(idx, 1);
         if (this.tempSets.length === 0) {
-            document.getElementById('btn-add-set').disabled = true;
+            const btn = document.getElementById('btn-add-set');
+            if(btn) btn.disabled = true;
         }
         this.render();
     },
@@ -287,5 +284,17 @@ const app = {
     }
 };
 
+// ==========================================
+// REJESTRACJA SERVICE WORKERA (PWA OFFLINE)
+// ==========================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('../sw.js')
+      .then(reg => console.log('Service Worker zarejestrowany:', reg.scope))
+      .catch(err => console.log('Błąd rejestracji Service Workera:', err));
+  });
+}
+
+// Udostępnienie obiektu app globalnie dla handlerów HTML (onclick)
 window.app = app;
 app.init();
