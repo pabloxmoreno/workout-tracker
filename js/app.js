@@ -242,7 +242,7 @@ const app = {
     }
 }
 
-    ssaveWorkout() {
+    saveWorkout() {
     if(this.tempSets.length === 0) {
         utils.showToast('Dodaj co najmniej jedno ćwiczenie!', 'error');
         return;
