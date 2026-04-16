@@ -70,15 +70,25 @@ export function generateId() {
  * Pokazywanie powiadomienia toast
  */
 export function showToast(message, type = 'info') {
-    const toast = document.getElementById('toast');
-    if (!toast) return;
+    let container = document.getElementById('toast-container');
     
-    // Bezpieczne ustawienie tekstu
-    toast.textContent = message;
+    // Create container if it doesn't exist
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.classList.remove('hidden');
+    toast.textContent = message;
+    
+    container.appendChild(toast);
     
     setTimeout(() => {
-        toast.classList.add('hidden');
+        toast.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
     }, 3000);
 }
