@@ -1,5 +1,3 @@
-name=sw.js url=https://github.com/pabloxmoreno/workout-tracker/blob/main/sw.js
-
 const CACHE_NAME = 'workout-tracker-v1';
 const ASSETS = [
   './',
