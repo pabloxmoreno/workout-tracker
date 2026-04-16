@@ -1,104 +1,86 @@
-const CACHE_NAME = 'workout-tracker-v1';
-const ASSETS = [
+const CACHE_NAME = 'tracker-fit-v1';
+const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './css/styles.css',
-  './js/app.js',
+  './css/style.css',
   './js/config.js',
-  './js/store.js',
-  './js/ui.js',
   './js/utils.js',
+  './js/ui.js',
+  './js/app.js',
   './manifest.json'
 ];
 
-// ✅ Instalacja - z error handling
-self.addEventListener('install', (e) => {
-  e.waitUntil(
+// Instalacja Service Workera - cache'owanie zasobów
+self.addEventListener('install', (event) => {
+  event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        // Spróbuj cachować wszystkie assety
-        return cache.addAll(ASSETS)
-          .catch(err => {
-            console.warn('Nie wszystkie assety zostały wczytane:', err);
-            // Cachuj co najmniej krytyczne pliki
-            return cache.addAll([
-              './index.html',
-              './manifest.json',
-              './css/styles.css'
-            ]);
-          });
+        console.log('Cache opened');
+        return cache.addAll(ASSETS_TO_CACHE);
       })
-      .catch(err => {
-        console.error('Błąd cachowania:', err);
+      .catch((err) => {
+        console.error('Failed to cache assets:', err);
       })
   );
+  // Aktywuj nowego SW od razu
+  self.skipWaiting();
 });
 
-// ✅ Aktywacja - czyść stare cache
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.map((key) => {
-        if (key !== CACHE_NAME) {
-          console.log('Usuwam cache:', key);
-          return caches.delete(key);
-        }
-      })
-    ))
+// Aktywacja - czyszczenie starych cache'ów
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
   );
+  // Przejęcie kontroli nad otwartymi stronami
+  self.clients.claim();
 });
 
-// ✅ FETCH - bezpieczne cachowanie
-self.addEventListener('fetch', (e) => {
-  // ✅ Nigdy nie cachuj dynamicznych danych
-  const url = new URL(e.request.url);
-  
-  // Lista endpointów które nie cachujemy
-  const noCachePatterns = [
-    'api/', // backend API
-    'analytics', // tracking
-    'sync', // synchronizacja
-  ];
-  
-  const shouldNotCache = noCachePatterns.some(pattern => 
-    url.pathname.includes(pattern)
-  );
-  
-  if (shouldNotCache) {
-    e.respondWith(fetch(e.request).catch(() => {
-      // Jeśli brak internetu, spróbuj cache'a
-      return caches.match(e.request);
-    }));
-    return;
-  }
-  
-  // ✅ Dla pozostałych: cache first, fallback to network
-  e.respondWith(
-    caches.match(e.request)
+// Strategia fetch: Cache First, falling back to Network
+self.addEventListener('fetch', (event) => {
+  // Ignoruj żądania inne niż GET
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    caches.match(event.request)
       .then((response) => {
-        // Jeśli w cache, zwróć
-        if (response) return response;
+        // Jeśli znaleziono w cache, zwróć odpowiedź
+        if (response) {
+          return response;
+        }
         
-        // Jeśli nie, pobierz z sieci i cachuj
-        return fetch(e.request)
-          .then((response) => {
-            // Sprawdź czy request jest cacheable
-            if (!response || response.status !== 200) {
-              return response;
+        // Jeśli nie ma w cache, pobierz z sieci
+        return fetch(event.request)
+          .then((networkResponse) => {
+            // Sprawdź czy odpowiedź jest poprawna
+            if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+              return networkResponse;
             }
-            
-            // Sklonuj response
-            const responseToCache = response.clone();
+
+            // Sklonuj odpowiedź, aby zapisać w cache i zwrócić użytkownikowi
+            const responseToCache = networkResponse.clone();
+
             caches.open(CACHE_NAME)
               .then((cache) => {
-                cache.put(e.request, responseToCache);
+                cache.put(event.request, responseToCache);
               });
-            
-            return response;
+
+            return networkResponse;
           })
           .catch(() => {
-            // Jeśli brak sieci i brak cache, zwróć offline page
-            return caches.match('./index.html');
+            // Fallback offline (np. strona błędu lub pusta odpowiedź)
+            // Dla tej aplikacji zwracamy podstawowy HTML jeśli wszystko zawiedzie
+            if (event.request.destination === 'document') {
+               return caches.match('./index.html');
+            }
           });
       })
   );
