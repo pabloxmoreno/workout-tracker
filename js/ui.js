@@ -1,313 +1,395 @@
+import { formatDate, escapeHtml } from './utils.js';
 import store from './store.js';
-import { utils } from './utils.js';
-import { MUSCLE_GROUPS } from './config.js';
+import { EXERCISES } from './config.js';
 
-export const ui = {
-    renderCalendar(container, appInstance) {
-        const year = appInstance.calendarYear;
-        const month = appInstance.calendarMonth;
+class UI {
+    constructor() {
+        this.mainContent = document.getElementById('main-content');
+        this.pageTitle = document.getElementById('page-title');
+        this.modal = document.getElementById('exercise-modal');
+        this.modalList = document.getElementById('modal-exercise-list');
+        this.searchInput = document.getElementById('exercise-search');
         
-        const firstDay = new Date(year, month, 1);
-        const lastDay = new Date(year, month + 1, 0);
-        const daysInMonth = lastDay.getDate();
-        const startDayIndex = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; 
+        this.setupEventListeners();
+    }
 
-        let html = `
-            <div class="card">
-                <div class="calendar-header">
-                    <button class="btn-outline" onclick="app.changeMonth(-1)">❮</button>
-                    <h2>${new Date(year, month).toLocaleString('pl-PL', { month: 'long', year: 'numeric' })}</h2>
-                    <button class="btn-outline" onclick="app.changeMonth(1)">❯</button>
-                </div>
-                <div class="calendar-grid">
-                    <div class="cal-day-name">Pn</div><div class="cal-day-name">Wt</div><div class="cal-day-name">Śr</div>
-                    <div class="cal-day-name">Cz</div><div class="cal-day-name">Pt</div><div class="cal-day-name">So</div><div class="cal-day-name">Nd</div>
-        `;
+    setupEventListeners() {
+        // Zamknij modal
+        document.getElementById('close-modal').addEventListener('click', () => this.hideModal());
+        
+        // Szukanie z debounce
+        let debounceTimer;
+        this.searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                this.filterExercises(e.target.value);
+            }, 300);
+        });
 
-        for(let i=0; i<startDayIndex; i++) html += `<div></div>`;
+        // Kliknięcie poza modalem
+        this.modal.addEventListener('click', (e) => {
+            if (e.target === this.modal) this.hideModal();
+        });
+    }
 
-        const todayStr = new Date().toISOString().split('T')[0];
-        for(let d=1; d<=daysInMonth; d++) {
-            const currentStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            const hasWorkout = store.logs.some(l => l.date === currentStr);
-            const isToday = currentStr === todayStr;
-            const isSelected = currentStr === appInstance.selectedDate;
+    renderCalendar(appInstance) {
+        this.pageTitle.textContent = 'Kalendarz';
+        const logs = store.getAllLogs();
+        
+        // Grupa logów po miesiącach
+        const months = {};
+        logs.forEach(log => {
+            const date = new Date(log.date);
+            const key = `${date.getFullYear()}-${date.getMonth()}`;
+            if (!months[key]) months[key] = [];
+            months[key].push(log);
+        });
+
+        this.mainContent.innerHTML = '';
+
+        Object.keys(months).sort().reverse().forEach(key => {
+            const [year, month] = key.split('-');
+            const monthLogs = months[key];
             
-            let classes = 'cal-day';
-            if(isToday) classes += ' today';
-            if(hasWorkout) classes += ' has-workout';
-            if(isSelected) classes += ' selected';
+            const monthEl = document.createElement('div');
+            monthEl.className = 'month-section';
+            
+            const monthTitle = document.createElement('h3');
+            monthTitle.textContent = new Date(year, month).toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+            monthEl.appendChild(monthTitle);
 
-            html += `<div class="${classes}" onclick="app.selectDate('${currentStr}')">${d}</div>`;
-        }
+            const grid = document.createElement('div');
+            grid.className = 'calendar-grid';
 
-        html += `</div>`; 
-
-        const dayLogs = store.logs.filter(l => l.date === appInstance.selectedDate);
-        html += `<div class="workout-preview">
-            <div class="flex flex-between">
-                <h3>Trening: ${appInstance.selectedDate}</h3>
-                <button class="btn-primary" onclick="app.prepLogForDate('${appInstance.selectedDate}', false)">+ Dodaj trening</button>
-            </div>`;
-        
-        if(dayLogs.length > 0) {
-            dayLogs.forEach(log => {
-                let vol = 0;
-                let exCount = log.exercises.length;
-                log.exercises.forEach(e => {
-                    if(!e.isCardio) vol += (e.sets.reduce((acc, s) => acc + (s.weight * s.reps), 0));
-                });
+            // Prosta siatka dni (uproszczona)
+            const daysInMonth = new Date(year, parseInt(month) + 1, 0).getDate();
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = `${year}-${String(parseInt(month)+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const dayLogs = monthLogs.filter(l => l.date === dateStr);
                 
-                const timeStr = new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                const dayEl = document.createElement('div');
+                dayEl.className = `calendar-day ${dayLogs.length > 0 ? 'has-workout' : ''}`;
+                dayEl.textContent = i;
+                
+                if (dayLogs.length > 0) {
+                    dayEl.addEventListener('click', () => appInstance.toggleDetails(dayLogs[0].id));
+                    dayEl.title = `${dayLogs.length} trening(ów)`;
+                }
+                
+                grid.appendChild(dayEl);
+            }
 
-                let detailsHtml = `<div class="workout-details-expanded hidden" id="details-${log.id}">`;
-                log.exercises.forEach(ex => {
-                    const exName = utils.getExerciseName(store.exercises, ex.exerciseId);
-                    detailsHtml += `<div class="exercise-block">
-                        <div class="exercise-title">${exName}</div>`;
-                    ex.sets.forEach((s, idx) => {
-                        detailsHtml += `
-                            <div class="set-detail">
-                                Seria ${idx+1}: <span>${s.weight}kg</span> x <span>${s.reps}</span>
-                                ${s.notes ? `- ${s.notes}` : ''}
-                            </div>`;
-                    });
-                    detailsHtml += `</div>`;
-                });
-                detailsHtml += `
-                    <div class="flex" style="margin-top:1rem">
-                        <button class="btn-primary btn-sm" onclick="app.prepLogForDate('${log.date}', '${log.id}')">Edytuj</button>
-                        <button class="btn-danger btn-sm" onclick="app.deleteLog('${log.id}')">Usuń</button>
-                    </div>
-                </div>`;
+            monthEl.appendChild(grid);
+            this.mainContent.appendChild(monthEl);
+        });
 
-                html += `
-                    <div class="workout-summary-item" onclick="app.toggleDetails('${log.id}')">
-                        <div class="flex flex-between">
-                            <strong>${Math.round(vol)} kg</strong>
-                            <small>${timeStr}</small>
-                        </div>
-                        <div style="font-size:0.85rem; color:var(--text-light);">${exCount} ćwiczeń</div>
-                        ${detailsHtml}
-                    </div>
-                `;
-            });
-        } else {
-            html += `<p style="color:var(--text-light); margin-top:1rem;">Brak treningów tego dnia.</p>`;
+        if (logs.length === 0) {
+            this.mainContent.innerHTML = '<p class="empty-state">Brak zapisanych treningów. Dodaj pierwszy!</p>';
         }
-        html += `</div></div>`; 
+    }
 
-        container.innerHTML = html;
-    },
+    renderLogForm(appInstance) {
+        this.pageTitle.textContent = 'Nowy Trening';
+        this.mainContent.innerHTML = '';
 
-    renderLogForm(container, appInstance) {
-        const isEdit = !!appInstance.editModeId;
-        const title = isEdit ? 'Edytuj Trening' : 'Nowy Trening';
+        const form = document.createElement('form');
+        form.className = 'workout-form';
+        form.id = 'new-workout-form';
 
-        // Struktura: Sticky Header -> Scroll Area -> Sticky Footer
-        let html = `
-            <div class="log-form-container">
-                <!-- STICKY HEADER -->
-                <div class="log-header card" style="margin-bottom:0; border-radius:0; box-shadow:none; background:transparent; padding:0;">
-                    <h2>${title}</h2>
-                    <label>Data</label>
-                    <input type="date" value="${appInstance.selectedDate}" onchange="app.selectedDate = this.value" style="margin-bottom:0.5rem">
-                    
-                    <button class="btn-primary btn-block" onclick="app.openExerciseModal()">
-                        + Wybierz ćwiczenie
-                    </button>
-                </div>
+        // Data
+        const dateGroup = document.createElement('div');
+        dateGroup.className = 'form-group';
+        const dateLabel = document.createElement('label');
+        dateLabel.textContent = 'Data';
+        const dateInput = document.createElement('input');
+        dateInput.type = 'date';
+        dateInput.value = new Date().toISOString().split('T')[0];
+        dateInput.name = 'date';
+        dateGroup.appendChild(dateLabel);
+        dateGroup.appendChild(dateInput);
+        form.appendChild(dateGroup);
 
-                <!-- SCROLL AREA (Serie) -->
-                <div class="log-scroll-area" id="log-scroll-area">
-                    ${this.renderSessionRows(appInstance)}
-                </div>
+        // Lista ćwiczeń kontener
+        const exercisesContainer = document.createElement('div');
+        exercisesContainer.id = 'form-exercises';
+        form.appendChild(exercisesContainer);
 
-                <!-- STICKY FOOTER -->
-                <div class="log-footer card" style="margin-top:0; border-radius:0; box-shadow:none; background:transparent; padding:0;">
-                    <button class="btn-outline btn-block" onclick="app.addSetToLastExercise()" id="btn-add-set" disabled>
-                        + Dodaj serię do ostatniego
-                    </button>
-                    <button class="btn-primary btn-block" onclick="app.saveWorkout()">
-                        ${isEdit ? 'Zapisz Zmiany' : 'Zakończ i Zapisz'}
-                    </button>
-                    ${isEdit ? `<button class="btn-outline btn-block" style="margin-top:0.5rem" onclick="app.navigate('calendar')">Anuluj</button>` : ''}
-                </div>
-            </div>
+        // Przycisk dodaj ćwiczenie
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn btn-secondary';
+        addBtn.textContent = '+ Dodaj ćwiczenie';
+        addBtn.addEventListener('click', () => appInstance.openExerciseModal());
+        form.appendChild(addBtn);
 
-            <!-- MODAL WYBORU ĆWICZENIA -->
-            <div id="exercise-modal" class="modal-overlay hidden" onclick="if(event.target === this) app.closeExerciseModal()">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Wybierz ćwiczenie</h3>
-                        <button class="btn-outline btn-sm" onclick="app.closeExerciseModal()">✕</button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="text" id="modal-search" placeholder="Szukaj ćwiczenia..." oninput="app.filterModalExercises()">
-                        
-                        <div class="muscle-filter" id="modal-filters">
-                            ${MUSCLE_GROUPS.map(g => `
-                                <button class="chip ${appInstance.modalFilter === g ? 'active' : ''}" 
-                                        onclick="app.setModalFilter('${g}')">
-                                    ${g.charAt(0).toUpperCase() + g.slice(1)}
-                                </button>
-                            `).join('')}
-                        </div>
+        // Przycisk zapisz
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'submit';
+        saveBtn.className = 'btn btn-primary';
+        saveBtn.textContent = 'Zapisz Trening';
+        saveBtn.style.marginTop = '20px';
+        saveBtn.style.width = '100%';
+        form.appendChild(saveBtn);
 
-                        <div id="modal-exercise-list">
-                            <!-- Lista generowana dynamicznie -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.innerHTML = html;
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            appInstance.saveWorkout();
+        });
+
+        this.mainContent.appendChild(form);
+    }
+
+    addExerciseToForm(exercise) {
+        const container = document.getElementById('form-exercises');
+        if (!container) return;
+
+        const exId = `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
-        // Jeśli edycja, odblokuj przycisk dodawania serii
-        if(appInstance.tempSets.length > 0) {
-            document.getElementById('btn-add-set').disabled = false;
-        }
-    },
+        const exCard = document.createElement('div');
+        exCard.className = 'exercise-card';
+        exCard.dataset.exerciseId = exId;
+        exCard.dataset.id = exercise.id;
 
-    renderSessionRows(appInstance) {
-        if(appInstance.tempSets.length === 0) {
-            return '<div style="text-align:center; color:var(--text-light); padding:2rem;">Brak ćwiczeń. Kliknij "Wybierz ćwiczenie" aby dodać.</div>';
-        }
+        const header = document.createElement('div');
+        header.className = 'exercise-header';
         
-        return appInstance.tempSets.map((item, exIndex) => `
-            <div class="card" style="padding:1rem; margin-bottom:1rem;">
-                <div class="flex flex-between" style="margin-bottom:0.5rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
-                    <strong style="color:var(--primary)">${utils.getExerciseName(store.exercises, item.exerciseId)}</strong>
-                    <button class="btn-danger btn-sm" onclick="app.removeSessionItem(${exIndex})">Usuń ćw.</button>
-                </div>
-                ${item.sets.map((s, sIdx) => `
-                    <div class="set-row">
-                        <div class="set-number">Seria ${sIdx + 1}</div>
-                        <div>
-                            <span class="set-label">Kg</span>
-                            <input type="number" step="0.5" inputmode="decimal" placeholder="0" value="${s.weight}" oninput="app.updateSet(${exIndex}, ${sIdx}, 'weight', this.value)">
-                        </div>
-                        <div>
-                            <span class="set-label">Powt.</span>
-                            <input type="number" step="1" inputmode="numeric" placeholder="0" value="${s.reps}" oninput="app.updateSet(${exIndex}, ${sIdx}, 'reps', this.value)">
-                        </div>
-                        <div style="grid-column: 1/-1">
-                            <span class="set-label">Notatka</span>
-                            <input type="text" placeholder="np. ból, łatwo" value="${s.notes || ''}" oninput="app.updateSet(${exIndex}, ${sIdx}, 'notes', this.value)" style="margin-bottom:0">
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `).join('');
-    },
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'exercise-name';
+        nameSpan.textContent = exercise.name; // Bezpieczne
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.ariaLabel = 'Usuń ćwiczenie';
+        removeBtn.addEventListener('click', () => exCard.remove());
+        
+        header.appendChild(nameSpan);
+        header.appendChild(removeBtn);
+        exCard.appendChild(header);
 
-    // Renderuje listę wewnątrz modala
-    renderModalList(exercises, appInstance) {
-        const listContainer = document.getElementById('modal-exercise-list');
-        if (!listContainer) return;
+        const setsContainer = document.createElement('div');
+        setsContainer.className = 'sets-container';
+        setsContainer.id = `sets-${exId}`;
+        
+        // Dodaj domyślny set
+        this.addSetRow(setsContainer, exId);
+        
+        exCard.appendChild(setsContainer);
 
-        if (exercises.length === 0) {
-            listContainer.innerHTML = '<p style="text-align:center; color:var(--text-light)">Brak wyników</p>';
+        const addSetBtn = document.createElement('button');
+        addSetBtn.type = 'button';
+        addSetBtn.className = 'btn btn-sm btn-outline';
+        addSetBtn.textContent = '+ Seria';
+        addSetBtn.style.marginTop = '10px';
+        addSetBtn.addEventListener('click', () => this.addSetRow(setsContainer, exId));
+        exCard.appendChild(addSetBtn);
+
+        container.appendChild(exCard);
+    }
+
+    addSetRow(container, exId) {
+        const row = document.createElement('div');
+        row.className = 'set-row';
+        
+        const inputs = [
+            { type: 'number', placeholder: 'kg', name: 'weight' },
+            { type: 'number', placeholder: 'powt.', name: 'reps' },
+            { type: 'text', placeholder: 'RPE', name: 'rpe', style: 'width: 60px' }
+        ];
+
+        inputs.forEach(conf => {
+            const input = document.createElement('input');
+            input.type = conf.type;
+            input.placeholder = conf.placeholder;
+            input.name = conf.name;
+            if (conf.style) input.style = conf.style;
+            row.appendChild(input);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn-icon';
+        delBtn.textContent = '🗑️';
+        delBtn.addEventListener('click', () => {
+            if (container.children.length > 1) row.remove();
+        });
+        row.appendChild(delBtn);
+
+        container.appendChild(row);
+    }
+
+    renderStats() {
+        this.pageTitle.textContent = 'Statystyki';
+        this.mainContent.innerHTML = '';
+
+        const logs = store.getAllLogs();
+        if (logs.length === 0) {
+            this.mainContent.innerHTML = '<p class="empty-state">Brak danych do statystyk.</p>';
             return;
         }
 
-        listContainer.innerHTML = exercises.map(ex => `
-            <div class="exercise-list-item" onclick="app.selectExerciseFromModal('${ex.id}')">
-                <div style="font-weight:bold">${ex.name}</div>
-                <div style="font-size:0.8rem; color:var(--text-light)">${ex.muscleGroup}</div>
-            </div>
-        `).join('');
-    },
+        const totalWorkouts = logs.length;
+        const totalSets = logs.reduce((acc, log) => {
+            return acc + log.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 0), 0);
+        }, 0);
 
-    renderStats(container) {
-        const now = new Date();
-        const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        const statsGrid = document.createElement('div');
+        statsGrid.className = 'stats-grid';
+
+        const createStatCard = (title, value) => {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            const h3 = document.createElement('h3');
+            h3.textContent = title;
+            const p = document.createElement('p');
+            p.className = 'stat-value';
+            p.textContent = value;
+            card.appendChild(h3);
+            card.appendChild(p);
+            return card;
+        };
+
+        statsGrid.appendChild(createStatCard('Treningi', totalWorkouts));
+        statsGrid.appendChild(createStatCard('Serie', totalSets));
         
-        const monthLogs = store.logs.filter(l => l.date.startsWith(currentMonthStr));
-        
-        const workoutCount = monthLogs.length;
-        let totalVolume = 0;
-        const muscleVolume = {};
+        this.mainContent.appendChild(statsGrid);
+    }
 
-        monthLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if(ex.isCardio) return;
-                const exVol = ex.sets.reduce((acc, s) => acc + (s.weight * s.reps), 0);
-                totalVolume += exVol;
+    renderSettings() {
+        this.pageTitle.textContent = 'Ustawienia';
+        this.mainContent.innerHTML = '';
 
-                const exDef = store.exercises.find(e => e.id === ex.exerciseId);
-                if(exDef) {
-                    const group = exDef.muscleGroup;
-                    muscleVolume[group] = (muscleVolume[group] || 0) + exVol;
+        const settingsDiv = document.createElement('div');
+        settingsDiv.className = 'settings-container';
+
+        const createRow = (labelText, actionElement) => {
+            const row = document.createElement('div');
+            row.className = 'setting-row';
+            const label = document.createElement('span');
+            label.textContent = labelText;
+            row.appendChild(label);
+            row.appendChild(actionElement);
+            return row;
+        };
+
+        // Dark Mode Toggle
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox';
+        toggle.checked = store.settings.darkMode;
+        toggle.addEventListener('change', () => {
+            store.toggleDarkMode();
+            document.body.classList.toggle('dark-mode');
+        });
+        settingsDiv.appendChild(createRow('Tryb ciemny', toggle));
+
+        // Export
+        const exportBtn = document.createElement('button');
+        exportBtn.className = 'btn btn-secondary';
+        exportBtn.textContent = 'Eksportuj dane';
+        exportBtn.addEventListener('click', () => {
+            const data = store.exportData();
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `workout-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        settingsDiv.appendChild(createRow('Kopia zapasowa', exportBtn));
+
+        // Import
+        const importInput = document.createElement('input');
+        importInput.type = 'file';
+        importInput.accept = '.json';
+        importInput.style.display = 'none';
+        importInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    if (store.importData(evt.target.result)) {
+                        alert('Dane zaimportowane pomyślnie!');
+                        window.location.reload();
+                    }
+                } catch (err) {
+                    alert('Błąd importu: ' + err.message);
                 }
-            });
+            };
+            reader.readAsText(file);
         });
 
-        const sortedMuscles = Object.entries(muscleVolume).sort((a,b) => b[1] - a[1]);
-        const maxVol = sortedMuscles.length > 0 ? sortedMuscles[0][1] : 1;
+        const importBtn = document.createElement('button');
+        importBtn.className = 'btn btn-secondary';
+        importBtn.textContent = 'Importuj dane';
+        importBtn.addEventListener('click', () => importInput.click());
+        settingsDiv.appendChild(createRow('Przywróć dane', importBtn));
+        settingsDiv.appendChild(importInput);
 
-        let html = `
-            <div class="grid">
-                <div class="card stat-card">
-                    <h3>Treningi w tym miesiącu</h3>
-                    <div class="stat-value">${workoutCount}</div>
-                </div>
-                <div class="card stat-card">
-                    <h3>Łączna objętość</h3>
-                    <div class="stat-value">${Math.round(totalVolume).toLocaleString()} <span style="font-size:1rem">kg</span></div>
-                </div>
-                
-                <div class="card">
-                    <h3>Top Partie (Objętość)</h3>
-                    ${sortedMuscles.length === 0 ? '<p>Brak danych</p>' : ''}
-                    <ul class="top-list" style="list-style:none">
-                        ${sortedMuscles.slice(0, 5).map(([m, v]) => `
-                            <li>
-                                <span>${m}</span>
-                                <span>${Math.round(v).toLocaleString()} kg</span>
-                            </li>
-                            <div class="bar-container">
-                                <div class="bar-fill" style="width: ${(v/maxVol)*100}%"></div>
-                            </div>
-                        `).join('')}
-                    </ul>
-                </div>
-            </div>
-        `;
-        container.innerHTML = html;
-    },
+        // Reset
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn btn-danger';
+        resetBtn.textContent = 'Resetuj wszystko';
+        resetBtn.addEventListener('click', () => {
+            if (confirm('Czy na pewno chcesz usunąć wszystkie dane?')) {
+                store.resetData();
+                window.location.reload();
+            }
+        });
+        settingsDiv.appendChild(createRow('Strefa niebezpieczna', resetBtn));
 
-    renderSettings(container) {
-        let html = `
-            <div class="card settings-group">
-                <h2>Wygląd</h2>
-                <div class="flex flex-between">
-                    <span>Tryb Ciemny</span>
-                    <button class="btn-outline" onclick="app.toggleTheme()">Przełącz</button>
-                </div>
-            </div>
-
-            <div class="card settings-group">
-                <h2>Dane</h2>
-                <div class="flex" style="margin-bottom:1rem">
-                    <button class="btn-primary" onclick="app.exportData()">Eksportuj JSON</button>
-                    <div class="file-input-wrapper">
-                        <button class="btn-outline">Importuj JSON</button>
-                        <input type="file" accept=".json" onchange="const f=new FileReader(); f.onload=(e)=>app.importData(e.target.result); f.readAsText(this.files[0])">
-                    </div>
-                </div>
-                <button class="btn-danger" onclick="app.resetData()">Reset Wszystkich Danych</button>
-            </div>
-
-            <div class="card settings-group">
-                <h2>Dodaj Własne Ćwiczenie</h2>
-                <input type="text" id="new-ex-name" placeholder="Nazwa ćwiczenia">
-                <select id="new-ex-group">
-                    ${MUSCLE_GROUPS.filter(g => g !== 'wszystkie').map(g => `<option value="${g}">${g}</option>`).join('')}
-                </select>
-                <button class="btn-primary" onclick="app.handleAddCustomExercise()">Dodaj</button>
-            </div>
-        `;
-        container.innerHTML = html;
+        this.mainContent.appendChild(settingsDiv);
     }
-};
+
+    showModal(exercises, onSelect) {
+        this.modalList.innerHTML = '';
+        this.searchInput.value = '';
+        this.currentOnSelect = onSelect;
+        
+        this.renderExerciseList(exercises);
+        this.modal.classList.remove('hidden');
+        this.searchInput.focus();
+    }
+
+    hideModal() {
+        this.modal.classList.add('hidden');
+        this.currentOnSelect = null;
+    }
+
+    renderExerciseList(exercises) {
+        this.modalList.innerHTML = '';
+        exercises.forEach(ex => {
+            const item = document.createElement('div');
+            item.className = 'exercise-item';
+            
+            const name = document.createElement('span');
+            name.textContent = ex.name; // Bezpieczne
+            
+            const group = document.createElement('small');
+            group.textContent = ex.muscleGroup;
+            group.style.color = 'var(--text-muted)';
+            
+            item.appendChild(name);
+            item.appendChild(group);
+            
+            item.addEventListener('click', () => {
+                if (this.currentOnSelect) this.currentOnSelect(ex);
+                this.hideModal();
+            });
+            
+            this.modalList.appendChild(item);
+        });
+    }
+
+    filterExercises(query) {
+        const filtered = EXERCISES.filter(ex => 
+            ex.name.toLowerCase().includes(query.toLowerCase()) ||
+            ex.muscleGroup.toLowerCase().includes(query.toLowerCase())
+        );
+        this.renderExerciseList(filtered);
+    }
+}
+
+export default new UI();
