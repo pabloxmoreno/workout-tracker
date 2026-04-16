@@ -1,5 +1,3 @@
-name=js/app.js url=https://github.com/pabloxmoreno/workout-tracker/blob/main/js/app.js
-
 import store from './store.js';
 import { ui } from './ui.js';
 import { utils } from './utils.js';
