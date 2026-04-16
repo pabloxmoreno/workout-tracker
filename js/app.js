@@ -287,6 +287,7 @@ const app = {
 // ==========================================
 // REJESTRACJA SERVICE WORKERA (PWA OFFLINE)
 // ==========================================
+// Rejestracja Service Workera
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('../sw.js')
@@ -295,6 +296,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Udostępnienie obiektu app globalnie dla handlerów HTML (onclick)
-window.app = app;
+// Inicjalizacja aplikacji
 app.init();

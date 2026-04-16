@@ -1,4 +1,5 @@
 import { DEFAULT_EXERCISES } from './config.js';
+import { utils } from './utils.js';
 
 const store = {
     exercises: [],
@@ -88,6 +89,21 @@ const store = {
     importData(jsonString) {
         try {
             const data = JSON.parse(jsonString);
+            
+            // Walidacja danych przed importem
+            if (!utils.validateImportData(data)) {
+                throw new Error('Nieprawidłowy format danych');
+            }
+            
+            // Sanitizacja nazw ćwiczeń (zapobieganie XSS)
+            if (data.exercises && Array.isArray(data.exercises)) {
+                data.exercises = data.exercises.map(ex => ({
+                    ...ex,
+                    name: utils.escapeHtml(ex.name),
+                    muscleGroup: utils.escapeHtml(ex.muscleGroup)
+                }));
+            }
+            
             if(data.exercises && data.logs) {
                 this.exercises = data.exercises;
                 this.logs = data.logs;
@@ -99,6 +115,7 @@ const store = {
             }
         } catch (e) {
             alert('Błąd importu: Nieprawidłowy plik.');
+            console.error('Import error:', e);
         }
     },
     
