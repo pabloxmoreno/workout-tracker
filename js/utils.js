@@ -1,6 +1,8 @@
 export const utils = {
     showToast(message, type = 'success') {
         const container = document.getElementById('toast-container');
+        if (!container) return; // Zabezpieczenie
+        
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.textContent = message;
@@ -17,13 +19,16 @@ export const utils = {
 
     validateNumber(value, allowDecimals = false) {
         if (value === '') return '';
-        const num = parseFloat(value);
+        // Usuń wszystko co nie jest cyfrą, kropką lub minusem
+        const cleaned = value.replace(/[^0-9.-]/g, '');
+        
+        const num = parseFloat(cleaned);
         if (isNaN(num)) return '';
         
         if (!allowDecimals && !Number.isInteger(num)) {
             return Math.floor(num).toString();
         }
-        return value;
+        return cleaned;
     },
 
     getExerciseName(exercises, id) {
