@@ -1,5 +1,3 @@
-name=js/store.js url=https://github.com/pabloxmoreno/workout-tracker/blob/main/js/store.js
-
 import { DEFAULT_EXERCISES } from './config.js';
 
 const store = {
