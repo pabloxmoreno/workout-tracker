@@ -28,10 +28,12 @@
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 body { background-color: var(--bg); color: var(--text); transition: background 0.3s, color 0.3s; padding-bottom: 80px; }
 
-button { cursor: pointer; border: none; border-radius: var(--radius); padding: 0.5rem 1rem; font-weight: 600; transition: opacity 0.2s; }
+button { cursor: pointer; border: none; border-radius: var(--radius); padding: 0.5rem 1rem; font-weight: 600; transition: opacity 0.2s; background: var(--surface); color: var(--text); }
 button:hover { opacity: 0.9; }
+.btn { background: var(--primary); color: white; }
 .btn-primary { background: var(--primary); color: white; }
 .btn-danger { background: var(--danger); color: white; }
+.btn-secondary { background: var(--text-light); color: white; }
 .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
 .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
 .btn-block { width: 100%; }
@@ -46,6 +48,36 @@ input, select, textarea { width: 100%; padding: 0.75rem; margin-bottom: 1rem; bo
 .grid { display: grid; gap: 1rem; }
 .hidden { display: none !important; }
 h1, h2, h3 { margin-bottom: 1rem; }
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 90;
+}
+.header h1 {
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.content {
+    padding: 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-light);
+    font-size: 1.1rem;
+}
 
 /* Navigation */
 nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 0.75rem; z-index: 100; }
@@ -207,7 +239,7 @@ nav svg { width: 24px; height: 24px; fill: currentColor; }
 }
 
 /* Modal Styles */
-.modal-overlay {
+.modal {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.5);
@@ -217,8 +249,12 @@ nav svg { width: 24px; height: 24px; fill: currentColor; }
     justify-content: center;
 }
 
+.modal.hidden {
+    display: none;
+}
+
 @media (min-width: 600px) {
-    .modal-overlay {
+    .modal {
         align-items: center;
     }
 }
@@ -252,6 +288,26 @@ nav svg { width: 24px; height: 24px; fill: currentColor; }
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-light);
+}
+
+#exercise-search {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    margin: 0;
+    border-radius: 0;
+}
+
+.exercise-list {
+    overflow-y: auto;
+    max-height: calc(90vh - 140px);
 }
 
 .modal-body {
