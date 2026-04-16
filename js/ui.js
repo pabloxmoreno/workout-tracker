@@ -47,6 +47,11 @@ class UI {
 
         this.mainContent.innerHTML = '';
 
+        if (logs.length === 0) {
+            this.mainContent.innerHTML = '<p class="empty-state">Brak zapisanych treningów. Dodaj pierwszy!</p>';
+            return;
+        }
+
         Object.keys(months).sort().reverse().forEach(key => {
             const [year, month] = key.split('-');
             const monthLogs = months[key];
@@ -61,17 +66,44 @@ class UI {
             const grid = document.createElement('div');
             grid.className = 'calendar-grid';
 
-            // Prosta siatka dni (uproszczona)
+            // Days of week header
+            const dayNames = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+            dayNames.forEach(name => {
+                const dayNameEl = document.createElement('div');
+                dayNameEl.className = 'cal-day-name';
+                dayNameEl.textContent = name;
+                grid.appendChild(dayNameEl);
+            });
+
+            // Calculate starting day of month (adjust for Monday start)
+            const firstDay = new Date(year, month, 1);
+            let startingDay = firstDay.getDay() - 1;
+            if (startingDay === -1) startingDay = 6; // Sunday becomes 6
+            
+            // Empty cells for days before the 1st
+            for (let i = 0; i < startingDay; i++) {
+                const emptyEl = document.createElement('div');
+                grid.appendChild(emptyEl);
+            }
+
+            // Days of month
             const daysInMonth = new Date(year, parseInt(month) + 1, 0).getDate();
+            const today = new Date();
             for (let i = 1; i <= daysInMonth; i++) {
                 const dateStr = `${year}-${String(parseInt(month)+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                 const dayLogs = monthLogs.filter(l => l.date === dateStr);
                 
                 const dayEl = document.createElement('div');
-                dayEl.className = `calendar-day ${dayLogs.length > 0 ? 'has-workout' : ''}`;
+                dayEl.className = 'cal-day';
                 dayEl.textContent = i;
                 
+                // Check if today
+                if (i === today.getDate() && month == today.getMonth() && year == today.getFullYear()) {
+                    dayEl.classList.add('today');
+                }
+                
                 if (dayLogs.length > 0) {
+                    dayEl.classList.add('has-workout');
                     dayEl.addEventListener('click', () => appInstance.toggleDetails(dayLogs[0].id));
                     dayEl.title = `${dayLogs.length} trening(ów)`;
                 }
@@ -82,10 +114,6 @@ class UI {
             monthEl.appendChild(grid);
             this.mainContent.appendChild(monthEl);
         });
-
-        if (logs.length === 0) {
-            this.mainContent.innerHTML = '<p class="empty-state">Brak zapisanych treningów. Dodaj pierwszy!</p>';
-        }
     }
 
     renderLogForm(appInstance) {
@@ -155,7 +183,7 @@ class UI {
         
         const nameSpan = document.createElement('span');
         nameSpan.className = 'exercise-name';
-        nameSpan.textContent = exercise.name; // Bezpieczne
+        nameSpan.textContent = exercise.name;
         
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
@@ -365,7 +393,7 @@ class UI {
             item.className = 'exercise-item';
             
             const name = document.createElement('span');
-            name.textContent = ex.name; // Bezpieczne
+            name.textContent = ex.name;
             
             const group = document.createElement('small');
             group.textContent = ex.muscleGroup;
