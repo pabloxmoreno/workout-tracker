@@ -11,7 +11,7 @@ const app = {
     activeMuscleFilter: 'wszystkie',
     tempSets: [], 
     editModeId: null,
-    searchQuery: '', // Przechowuje stan wyszukiwarki
+    tempSelectedExercise: '', // Pomocnicze do utrzymania wyboru w dropdownie
 
     init() {
         store.init();
@@ -20,14 +20,6 @@ const app = {
 
     navigate(view) {
         this.currentView = view;
-        
-        // KLUCZOWA POPRAWKA: Czyszczenie stanu przy wejściu w nowy widok
-        if (view === 'log' && this.editModeId === null) {
-            // Jeśli wchodzimy w tryb "Dodaj" (nie edycja), wyczyść stare dane
-            this.tempSets = [];
-            this.searchQuery = '';
-        }
-
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
         document.getElementById(`nav-${view}`).classList.add('active');
         
@@ -41,12 +33,10 @@ const app = {
     },
 
     render() {
-        // Odświeża obecny widok bez utraty stanu (np. wpisanego tekstu w wyszukiwarce)
-        const container = document.getElementById('app');
-        if (this.currentView === 'calendar') ui.renderCalendar(container, this);
-        if (this.currentView === 'log') ui.renderLogForm(container, this);
-        if (this.currentView === 'stats') ui.renderStats(container);
-        if (this.currentView === 'settings') ui.renderSettings(container);
+        if (this.currentView === 'calendar') ui.renderCalendar(document.getElementById('app'), this);
+        if (this.currentView === 'log') ui.renderLogForm(document.getElementById('app'), this);
+        if (this.currentView === 'stats') ui.renderStats(document.getElementById('app'));
+        if (this.currentView === 'settings') ui.renderSettings(document.getElementById('app'));
     },
 
     changeMonth(delta) {
@@ -79,35 +69,74 @@ const app = {
     prepLogForDate(dateStr, editId) {
         this.selectedDate = dateStr;
         this.editModeId = editId;
+        this.tempSelectedExercise = '';
         
         if (editId) {
-            // Tryb edycji: ładujemy dane
             const log = store.getLog(editId);
             if (log) {
                 this.tempSets = log.exercises.map(ex => ({
                     exerciseId: ex.exerciseId,
                     isCardio: ex.isCardio,
-                    sets: ex.sets.map(s => ({...s})) // Głęboka kopia
+                    sets: ex.sets.map(s => ({...s}))
                 }));
             }
         } else {
-            // Tryb dodawania: CZYŚCIMY dane
+            // KLUCZOWA POPRAWKA: Zawsze czyścimy tempSets przy nowym treningu
             this.tempSets = [];
-            this.searchQuery = '';
         }
         
         this.navigate('log');
     },
 
-    // Nowa funkcja obsługująca wyszukiwanie
-    handleSearch(query) {
-        this.searchQuery = query.toLowerCase();
-        this.render(); // Przerysuj listę ćwiczeń na podstawie query
+    setMuscleFilter(group) {
+        this.activeMuscleFilter = group;
+        // Odświeżamy tylko opcje w select, nie cały formularz (żeby nie stracić fokusa w search)
+        // Ale musimy przebudować opcje w select, więc lekko odświeżamy fragment UI
+        const select = document.getElementById('exercise-select');
+        if(select) {
+            const currentVal = select.value;
+            // Zachowajmy pierwszą opcję (-- Wybierz --) i nadpisz resztę
+            const firstOption = select.options[0];
+            select.innerHTML = '';
+            select.appendChild(firstOption);
+            
+            const exercisesList = store.exercises.sort((a,b) => a.name.localeCompare(b.name));
+            const filtered = group === 'wszystkie' 
+                ? exercisesList 
+                : exercisesList.filter(e => e.muscleGroup === group);
+            
+            filtered.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e.id;
+                opt.text = `${e.name} (${e.muscleGroup})`;
+                select.appendChild(opt);
+            });
+            
+            // Przywróć wybór jeśli nadal valid
+            if(currentVal && filtered.some(e => e.id === currentVal)) {
+                select.value = currentVal;
+                this.tempSelectedExercise = currentVal;
+            } else {
+                select.value = "";
+                this.tempSelectedExercise = "";
+            }
+        }
+        // Aktualizuj wizualnie chipy
+        document.querySelectorAll('.chip').forEach(c => {
+            c.classList.toggle('active', c.textContent.toLowerCase().includes(group));
+        });
     },
 
-    addExerciseToSession() {
+    filterExercises() {
+        const query = document.getElementById('exercise-search').value;
+        // UWAGA: Nie wywołujemy render()! To powodowało utratę fokusa.
+        // Wywołujemy tylko metodę w UI, która zmienia display: none/options
+        ui.updateExerciseDropdownVisibility(query);
+    },
+
+    addExerciseFromSelect() {
         const select = document.getElementById('exercise-select');
-        const id = select.value;
+        const id = select ? select.value : null;
         
         if(!id) {
             utils.showToast('Wybierz ćwiczenie z listy!', 'error');
@@ -118,26 +147,52 @@ const app = {
         this.tempSets.push({
             exerciseId: id,
             isCardio: ex.isCardio || false,
-            sets: [{ weight: '', reps: '', notes: '' }] // Domyślnie pusta seria
+            sets: [{ weight: '', reps: '', notes: '' }]
         });
         
-        // Opcjonalnie: wyczyść selection po dodaniu
-        select.value = "";
-        this.searchQuery = ""; 
-        const searchInput = document.getElementById('exercise-search');
-        if(searchInput) searchInput.value = "";
+        this.tempSelectedExercise = '';
+        if(select) select.value = ""; // Reset selecta
         
-        this.render();
+        // Odśwież listę sesji (tylko środkową część)
+        const sessionList = document.getElementById('session-list');
+        if(sessionList) {
+            sessionList.innerHTML = ui.renderSessionRows(this);
+            // Scroll do nowo dodanego ćwiczenia
+            sessionList.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
     },
 
     removeSessionItem(idx) {
         this.tempSets.splice(idx, 1);
-        this.render();
+        const sessionList = document.getElementById('session-list');
+        if(sessionList) sessionList.innerHTML = ui.renderSessionRows(this);
+    },
+
+    addSetToLastExercise() {
+        if(this.tempSets.length === 0) {
+            utils.showToast('Najpierw dodaj ćwiczenie!', 'error');
+            return;
+        }
+        const lastIdx = this.tempSets.length - 1;
+        this.tempSets[lastIdx].sets.push({ weight: '', reps: '', notes: '' });
+        
+        const sessionList = document.getElementById('session-list');
+        if(sessionList) {
+            sessionList.innerHTML = ui.renderSessionRows(this);
+            // Scroll do nowej serii
+            const cards = sessionList.getElementsByClassName('exercise-card');
+            const lastCard = cards[cards.length - 1];
+            const sets = lastCard.getElementsByClassName('set-row');
+            if(sets.length > 0) {
+                sets[sets.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
     },
 
     addSetToExercise(exIdx) {
         this.tempSets[exIdx].sets.push({ weight: '', reps: '', notes: '' });
-        this.render();
+        const sessionList = document.getElementById('session-list');
+        if(sessionList) sessionList.innerHTML = ui.renderSessionRows(this);
     },
 
     removeSet(exIdx, setIdx) {
@@ -145,18 +200,17 @@ const app = {
         if(this.tempSets[exIdx].sets.length === 0) {
             this.removeSessionItem(exIdx);
         } else {
-            this.render();
+            const sessionList = document.getElementById('session-list');
+            if(sessionList) sessionList.innerHTML = ui.renderSessionRows(this);
         }
     },
 
     updateSet(exIdx, setIdx, field, value) {
-        // Walidacja danych w czasie rzeczywistym
         if (field === 'weight') {
-            value = utils.validateNumber(value, true); // Pozwól na przecinki/kropki
+            value = utils.validateNumber(value, true);
         } else if (field === 'reps') {
-            value = utils.validateNumber(value, false); // Tylko całkowite
+            value = utils.validateNumber(value, false);
         }
-        
         this.tempSets[exIdx].sets[setIdx][field] = value;
     },
 
@@ -177,7 +231,7 @@ const app = {
         })).filter(ex => ex.sets.length > 0);
 
         if(cleanExercises.length === 0) {
-            utils.showToast('Wypełnij dane przynajmniej jednej serii!', 'error');
+            utils.showToast('Wypełnij dane serii!', 'error');
             return;
         }
 
@@ -201,13 +255,11 @@ const app = {
                 exercises: cleanExercises
             };
             store.addLog(newLog);
-            utils.showToast('Trening zapisany pomyślnie!', 'success');
+            utils.showToast('Trening zapisany!', 'success');
         }
 
-        // Reset po zapisie
         this.tempSets = [];
         this.editModeId = null;
-        this.searchQuery = '';
         this.navigate('calendar');
     },
 
@@ -235,14 +287,9 @@ const app = {
             store.addCustomExercise(name, group);
             utils.showToast('Dodano ćwiczenie!', 'success');
             document.getElementById('new-ex-name').value = '';
-            // Odśwież listę ćwiczeń jeśli jesteśmy w logowaniu
-            if(this.currentView === 'log') this.render();
-        } else {
-            utils.showToast('Podaj nazwę ćwiczenia', 'error');
         }
     }
 };
 
-// Udostępnienie obiektu app globalnie dla handlerów HTML (onclick)
 window.app = app;
 app.init();
