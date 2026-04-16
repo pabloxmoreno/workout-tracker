@@ -1,4 +1,4 @@
-export const DEFAULT_EXERCISES = [
+export const EXERCISES = [
     { id: 'e1', name: 'Wyciskanie sztangi leżąc', muscleGroup: 'klatka' },
     { id: 'e2', name: 'Wyciskanie hantli na skosie', muscleGroup: 'klatka' },
     { id: 'e3', name: 'Pompki na poręczach', muscleGroup: 'klatka' },
