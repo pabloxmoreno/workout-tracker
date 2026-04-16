@@ -68,8 +68,8 @@ export const ui = {
                     ex.sets.forEach((s, idx) => {
                         detailsHtml += `
                             <div class="set-detail">
-                                Seria ${idx+1}: <span>${s.weight}kg</span> x <span>${s.reps}</span>
-                                ${s.notes ? `- ${s.notes}` : ''}
+                                <strong>Seria ${idx+1}:</strong> ${s.weight}kg x ${s.reps} powt.
+                                ${s.notes ? `<span style="color:var(--text-light)">(${s.notes})</span>` : ''}
                             </div>`;
                     });
                     detailsHtml += `</div>`;
@@ -101,10 +101,18 @@ export const ui = {
     },
 
     renderLogForm(container, appInstance) {
+        // Filtruj ćwiczenia na podstawie aktywnej grupy
         const exercisesList = store.exercises.sort((a,b) => a.name.localeCompare(b.name));
-        const filteredExercises = appInstance.activeMuscleFilter === 'wszystkie' 
+        let filteredExercises = appInstance.activeMuscleFilter === 'wszystkie' 
             ? exercisesList 
             : exercisesList.filter(e => e.muscleGroup === appInstance.activeMuscleFilter);
+
+        // Dodatkowe filtrowanie jeśli wpisano tekst w lupkę (przy odświeżaniu widoku)
+        const searchInput = document.getElementById('exercise-search');
+        const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
+        if (searchQuery) {
+            filteredExercises = filteredExercises.filter(e => e.name.toLowerCase().includes(searchQuery));
+        }
 
         const isEdit = !!appInstance.editModeId;
         const title = isEdit ? 'Edytuj Trening' : 'Dodaj Trening';
@@ -113,7 +121,7 @@ export const ui = {
             <div class="card">
                 <h2>${title}</h2>
                 <label>Data treningu</label>
-                <input type="date" value="${appInstance.selectedDate}" onchange="app.selectedDate = this.value">
+                <input type="date" value="${appInstance.selectedDate}" onchange="app.selectedDate = this.value; app.render()">
                 
                 <div class="muscle-filter">
                     ${MUSCLE_GROUPS.map(g => `
@@ -124,22 +132,26 @@ export const ui = {
                     `).join('')}
                 </div>
 
-                <label>Wyszukaj ćwiczenie</label>
-                <input type="text" id="exercise-search" placeholder="Wpisz nazwę..." oninput="app.filterExercises()">
+                <label>🔍 Wyszukaj ćwiczenie</label>
+                <input type="text" id="exercise-search" placeholder="Np. przysiad, wyciskanie..." 
+                       value="${searchQuery}" 
+                       oninput="app.handleSearch(this.value)">
                 
-                <label>Wybierz ćwiczenie</label>
-                <select id="exercise-select">
-                    <option value="">-- Wybierz --</option>
+                <label>Wybierz z listy</label>
+                <select id="exercise-select" size="5">
+                    <option value="">-- Wybierz ćwiczenie --</option>
                     ${filteredExercises.map(e => `<option value="${e.id}">${e.name} (${e.muscleGroup})</option>`).join('')}
                 </select>
-                <button class="btn-outline" style="width:100%; margin-bottom:1rem;" onclick="app.addExerciseToSession()">+ Dodaj do sesji</button>
+                <button class="btn-primary" style="width:100%; margin: 0.5rem 0;" onclick="app.addExerciseToSession()">+ Dodaj wybrane ćwiczenie</button>
 
-                <div id="session-area">
+                <div id="session-area" style="margin-top: 1.5rem;">
                     ${this.renderSessionRows(appInstance)}
                 </div>
 
                 <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
-                    <button class="btn-primary" style="width:100%" onclick="app.saveWorkout()">${isEdit ? 'Zapisz Zmiany' : 'Zapisz Trening'}</button>
+                    <button class="btn-primary" style="width:100%; font-size: 1.1rem;" onclick="app.saveWorkout()">
+                        ${isEdit ? '💾 Zapisz Zmiany' : '✅ Zakończ i Zapisz Trening'}
+                    </button>
                     ${isEdit ? `<button class="btn-outline" style="width:100%; margin-top:0.5rem" onclick="app.navigate('calendar')">Anuluj</button>` : ''}
                 </div>
             </div>
@@ -148,35 +160,44 @@ export const ui = {
     },
 
     renderSessionRows(appInstance) {
-        if(appInstance.tempSets.length === 0) return '<p style="text-align:center; color:var(--text-light)">Dodaj ćwiczenie powyżej, aby rozpocząć.</p>';
+        if(appInstance.tempSets.length === 0) {
+            return '<div style="text-align:center; padding: 2rem; color:var(--text-light); background:var(--bg); border-radius:var(--radius); border: 2px dashed var(--border);">Brak dodanych ćwiczeń.<br>Użyj wyszukiwarki i listy powyżej, aby dodać pierwsze ćwiczenie.</div>';
+        }
         
-        return appInstance.tempSets.map((item, index) => `
-            <div class="card" style="padding:1rem; margin-bottom:0.5rem;">
-                <div class="flex flex-between" style="margin-bottom:0.5rem">
-                    <strong>${utils.getExerciseName(store.exercises, item.exerciseId)}</strong>
-                    <button class="btn-danger" style="padding:2px 6px; font-size:0.8rem" onclick="app.removeSessionItem(${index})">X</button>
+        return appInstance.tempSets.map((item, exIndex) => `
+            <div class="card" style="padding:1rem; margin-bottom:1rem; border-left: 4px solid var(--primary);">
+                <div class="flex flex-between" style="margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
+                    <strong style="font-size:1.1rem;">${utils.getExerciseName(store.exercises, item.exerciseId)}</strong>
+                    <button class="btn-danger btn-sm" onclick="app.removeSessionItem(${exIndex})">Usuń ćwiczenie</button>
                 </div>
-                ${item.sets.map((s, sIdx) => `
-                    <div class="set-row">
+                
+                ${item.sets.map((s, setIndex) => `
+                    <div class="set-row" style="background: var(--bg); padding: 0.5rem; border-radius: var(--radius); margin-bottom: 0.5rem;">
+                        <div style="grid-column: 1 / -1; font-size: 0.8rem; font-weight: bold; color: var(--primary); margin-bottom: 0.25rem;">
+                            SERIA ${setIndex + 1}
+                        </div>
+                        
                         <div>
                             <span class="set-label">Ciężar (kg)</span>
-                            <input type="number" step="0.5" placeholder="kg" value="${s.weight}" oninput="app.updateSet(${index}, ${sIdx}, 'weight', this.value)">
+                            <input type="number" step="0.5" min="0" placeholder="0" value="${s.weight}" 
+                                   oninput="app.updateSet(${exIndex}, ${setIndex}, 'weight', this.value)">
                         </div>
                         <div>
                             <span class="set-label">Powtórzenia</span>
-                            <input type="number" step="1" placeholder="rep" value="${s.reps}" oninput="app.updateSet(${index}, ${sIdx}, 'reps', this.value)">
+                            <input type="number" step="1" min="0" placeholder="0" value="${s.reps}" 
+                                   oninput="app.updateSet(${exIndex}, ${setIndex}, 'reps', this.value)">
                         </div>
-                        <div>
-                            <span class="set-label">Notatka</span>
-                            <input type="text" placeholder="np. ból" value="${s.notes || ''}" oninput="app.updateSet(${index}, ${sIdx}, 'notes', this.value)">
-                        </div>
-                        <div style="display:flex; align-items:end;">
-                             <span class="set-label" style="visibility:hidden">Akacja</span>
-                             <button class="btn-danger btn-sm" style="width:100%" onclick="app.removeSet(${index}, ${sIdx})">-</button>
+                        <div style="grid-column: 1 / -1;">
+                            <span class="set-label">Notatka (opcjonalnie)</span>
+                            <input type="text" placeholder="Np. pauza, ból barku..." value="${s.notes || ''}" 
+                                   oninput="app.updateSet(${exIndex}, ${setIndex}, 'notes', this.value)">
                         </div>
                     </div>
                 `).join('')}
-                <button class="btn-outline" style="font-size:0.8rem; margin-top:0.5rem" onclick="app.addSetToExercise(${index})">+ Dodaj serię</button>
+                
+                <button class="btn-outline" style="width:100%; margin-top:0.5rem;" onclick="app.addSetToExercise(${exIndex})">
+                    + Dodaj kolejną serię
+                </button>
             </div>
         `).join('');
     },
@@ -221,7 +242,7 @@ export const ui = {
                 
                 <div class="card">
                     <h3>Top Partie (Objętość)</h3>
-                    ${sortedMuscles.length === 0 ? '<p>Brak danych</p>' : ''}
+                    ${sortedMuscles.length === 0 ? '<p>Brak danych w tym miesiącu.</p>' : ''}
                     <ul class="top-list" style="list-style:none">
                         ${sortedMuscles.slice(0, 5).map(([m, v]) => `
                             <li>
@@ -251,7 +272,7 @@ export const ui = {
 
             <div class="card settings-group">
                 <h2>Dane</h2>
-                <div class="flex" style="margin-bottom:1rem">
+                <div class="flex" style="margin-bottom:1rem; flex-wrap: wrap; gap: 0.5rem;">
                     <button class="btn-primary" onclick="app.exportData()">Eksportuj JSON</button>
                     <div class="file-input-wrapper">
                         <button class="btn-outline">Importuj JSON</button>

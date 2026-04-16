@@ -11,6 +11,7 @@ const app = {
     activeMuscleFilter: 'wszystkie',
     tempSets: [], 
     editModeId: null,
+    searchQuery: '', // Przechowuje stan wyszukiwarki
 
     init() {
         store.init();
@@ -19,6 +20,14 @@ const app = {
 
     navigate(view) {
         this.currentView = view;
+        
+        // KLUCZOWA POPRAWKA: Czyszczenie stanu przy wejściu w nowy widok
+        if (view === 'log' && this.editModeId === null) {
+            // Jeśli wchodzimy w tryb "Dodaj" (nie edycja), wyczyść stare dane
+            this.tempSets = [];
+            this.searchQuery = '';
+        }
+
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
         document.getElementById(`nav-${view}`).classList.add('active');
         
@@ -32,11 +41,12 @@ const app = {
     },
 
     render() {
-        // Helper do odświeżania текущего widoku
-        if (this.currentView === 'calendar') ui.renderCalendar(document.getElementById('app'), this);
-        if (this.currentView === 'log') ui.renderLogForm(document.getElementById('app'), this);
-        if (this.currentView === 'stats') ui.renderStats(document.getElementById('app'));
-        if (this.currentView === 'settings') ui.renderSettings(document.getElementById('app'));
+        // Odświeża obecny widok bez utraty stanu (np. wpisanego tekstu w wyszukiwarce)
+        const container = document.getElementById('app');
+        if (this.currentView === 'calendar') ui.renderCalendar(container, this);
+        if (this.currentView === 'log') ui.renderLogForm(container, this);
+        if (this.currentView === 'stats') ui.renderStats(container);
+        if (this.currentView === 'settings') ui.renderSettings(container);
     },
 
     changeMonth(delta) {
@@ -71,43 +81,52 @@ const app = {
         this.editModeId = editId;
         
         if (editId) {
+            // Tryb edycji: ładujemy dane
             const log = store.getLog(editId);
             if (log) {
                 this.tempSets = log.exercises.map(ex => ({
                     exerciseId: ex.exerciseId,
                     isCardio: ex.isCardio,
-                    sets: ex.sets.map(s => ({...s}))
+                    sets: ex.sets.map(s => ({...s})) // Głęboka kopia
                 }));
             }
         } else {
+            // Tryb dodawania: CZYŚCIMY dane
             this.tempSets = [];
+            this.searchQuery = '';
         }
         
         this.navigate('log');
     },
 
-    filterExercises() {
-        const query = document.getElementById('exercise-search').value.toLowerCase();
-        const select = document.getElementById('exercise-select');
-        const options = select.options;
-        
-        for (let i = 1; i < options.length; i++) {
-            const text = options[i].text.toLowerCase();
-            options[i].style.display = text.includes(query) ? '' : 'none';
-        }
+    // Nowa funkcja obsługująca wyszukiwanie
+    handleSearch(query) {
+        this.searchQuery = query.toLowerCase();
+        this.render(); // Przerysuj listę ćwiczeń na podstawie query
     },
 
     addExerciseToSession() {
         const select = document.getElementById('exercise-select');
         const id = select.value;
-        if(!id) return;
+        
+        if(!id) {
+            utils.showToast('Wybierz ćwiczenie z listy!', 'error');
+            return;
+        }
         
         const ex = store.exercises.find(e => e.id === id);
         this.tempSets.push({
             exerciseId: id,
             isCardio: ex.isCardio || false,
-            sets: [{ weight: '', reps: '', notes: '' }]
+            sets: [{ weight: '', reps: '', notes: '' }] // Domyślnie pusta seria
         });
+        
+        // Opcjonalnie: wyczyść selection po dodaniu
+        select.value = "";
+        this.searchQuery = ""; 
+        const searchInput = document.getElementById('exercise-search');
+        if(searchInput) searchInput.value = "";
+        
         this.render();
     },
 
@@ -131,11 +150,11 @@ const app = {
     },
 
     updateSet(exIdx, setIdx, field, value) {
-        // Walidacja danych
+        // Walidacja danych w czasie rzeczywistym
         if (field === 'weight') {
-            value = utils.validateNumber(value, true); //允许小数
+            value = utils.validateNumber(value, true); // Pozwól na przecinki/kropki
         } else if (field === 'reps') {
-            value = utils.validateNumber(value, false); // tylko整数
+            value = utils.validateNumber(value, false); // Tylko całkowite
         }
         
         this.tempSets[exIdx].sets[setIdx][field] = value;
@@ -158,7 +177,7 @@ const app = {
         })).filter(ex => ex.sets.length > 0);
 
         if(cleanExercises.length === 0) {
-            utils.showToast('Wypełnij dane serii!', 'error');
+            utils.showToast('Wypełnij dane przynajmniej jednej serii!', 'error');
             return;
         }
 
@@ -182,11 +201,13 @@ const app = {
                 exercises: cleanExercises
             };
             store.addLog(newLog);
-            utils.showToast('Trening zapisany!', 'success');
+            utils.showToast('Trening zapisany pomyślnie!', 'success');
         }
 
+        // Reset po zapisie
         this.tempSets = [];
         this.editModeId = null;
+        this.searchQuery = '';
         this.navigate('calendar');
     },
 
@@ -200,7 +221,6 @@ const app = {
 
     toggleTheme() {
         store.toggleTheme();
-        // Odśwież widok, aby kolory się zaktualizowały
         this.render();
     },
 
@@ -215,6 +235,10 @@ const app = {
             store.addCustomExercise(name, group);
             utils.showToast('Dodano ćwiczenie!', 'success');
             document.getElementById('new-ex-name').value = '';
+            // Odśwież listę ćwiczeń jeśli jesteśmy w logowaniu
+            if(this.currentView === 'log') this.render();
+        } else {
+            utils.showToast('Podaj nazwę ćwiczenia', 'error');
         }
     }
 };
