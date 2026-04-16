@@ -68,8 +68,8 @@ export const ui = {
                     ex.sets.forEach((s, idx) => {
                         detailsHtml += `
                             <div class="set-detail">
-                                <strong>Seria ${idx+1}:</strong> ${s.weight}kg x ${s.reps} powt.
-                                ${s.notes ? `<span style="color:var(--text-light)">(${s.notes})</span>` : ''}
+                                Seria ${idx+1}: <span>${s.weight}kg</span> x <span>${s.reps}</span>
+                                ${s.notes ? `- ${s.notes}` : ''}
                             </div>`;
                     });
                     detailsHtml += `</div>`;
@@ -101,103 +101,121 @@ export const ui = {
     },
 
     renderLogForm(container, appInstance) {
-        // Filtruj ćwiczenia na podstawie aktywnej grupy
-        const exercisesList = store.exercises.sort((a,b) => a.name.localeCompare(b.name));
-        let filteredExercises = appInstance.activeMuscleFilter === 'wszystkie' 
-            ? exercisesList 
-            : exercisesList.filter(e => e.muscleGroup === appInstance.activeMuscleFilter);
-
-        // Dodatkowe filtrowanie jeśli wpisano tekst w lupkę (przy odświeżaniu widoku)
-        const searchInput = document.getElementById('exercise-search');
-        const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
-        if (searchQuery) {
-            filteredExercises = filteredExercises.filter(e => e.name.toLowerCase().includes(searchQuery));
-        }
-
         const isEdit = !!appInstance.editModeId;
         const title = isEdit ? 'Edytuj Trening' : 'Dodaj Trening';
 
+        // Renderujemy strukturę ze sticky header/footer
         let html = `
-            <div class="card">
-                <h2>${title}</h2>
-                <label>Data treningu</label>
-                <input type="date" value="${appInstance.selectedDate}" onchange="app.selectedDate = this.value; app.render()">
-                
-                <div class="muscle-filter">
-                    ${MUSCLE_GROUPS.map(g => `
-                        <button class="chip ${appInstance.activeMuscleFilter === g ? 'active' : ''}" 
-                                onclick="app.activeMuscleFilter='${g}'; app.render()">
-                            ${g.charAt(0).toUpperCase() + g.slice(1)}
-                        </button>
-                    `).join('')}
+            <div class="log-container">
+                <!-- STICKY HEADER: Filtry i Wyszukiwarka -->
+                <div class="sticky-header">
+                    <h2 style="margin-bottom:0.5rem">${title}</h2>
+                    
+                    <label style="font-size:0.8rem; color:var(--text-light)">Data</label>
+                    <input type="date" value="${appInstance.selectedDate}" onchange="app.selectedDate = this.value" style="margin-bottom:1rem">
+                    
+                    <div class="muscle-filter">
+                        ${MUSCLE_GROUPS.map(g => `
+                            <button class="chip ${appInstance.activeMuscleFilter === g ? 'active' : ''}" 
+                                    onclick="app.setMuscleFilter('${g}')">
+                                ${g.charAt(0).toUpperCase() + g.slice(1)}
+                            </button>
+                        `).join('')}
+                    </div>
+
+                    <label style="font-size:0.8rem; color:var(--text-light)">Szukaj ćwiczenia</label>
+                    <input type="text" id="exercise-search" placeholder="Np. przysiad..." oninput="app.filterExercises()" autocomplete="off">
+                    
+                    <label style="font-size:0.8rem; color:var(--text-light); margin-top:0.5rem">Wybierz z listy</label>
+                    <select id="exercise-select" onchange="app.tempSelectedExercise = this.value">
+                        <option value="" disabled selected>-- Wybierz ćwiczenie --</option>
+                        ${this.getExerciseOptions(appInstance)}
+                    </select>
                 </div>
 
-                <label>🔍 Wyszukaj ćwiczenie</label>
-                <input type="text" id="exercise-search" placeholder="Np. przysiad, wyciskanie..." 
-                       value="${searchQuery}" 
-                       oninput="app.handleSearch(this.value)">
-                
-                <label>Wybierz z listy</label>
-                <select id="exercise-select" size="5">
-                    <option value="">-- Wybierz ćwiczenie --</option>
-                    ${filteredExercises.map(e => `<option value="${e.id}">${e.name} (${e.muscleGroup})</option>`).join('')}
-                </select>
-                <button class="btn-primary" style="width:100%; margin: 0.5rem 0;" onclick="app.addExerciseToSession()">+ Dodaj wybrane ćwiczenie</button>
-
-                <div id="session-area" style="margin-top: 1.5rem;">
+                <!-- LISTA ĆWICZEŃ I SERII -->
+                <div class="session-list" id="session-list">
                     ${this.renderSessionRows(appInstance)}
                 </div>
 
-                <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
-                    <button class="btn-primary" style="width:100%; font-size: 1.1rem;" onclick="app.saveWorkout()">
-                        ${isEdit ? '💾 Zapisz Zmiany' : '✅ Zakończ i Zapisz Trening'}
+                <!-- STICKY FOOTER: Akcje -->
+                <div class="sticky-footer">
+                    <button class="btn-outline btn-block" onclick="app.addExerciseFromSelect()">
+                        + Dodaj wybrane ćwiczenie
                     </button>
-                    ${isEdit ? `<button class="btn-outline" style="width:100%; margin-top:0.5rem" onclick="app.navigate('calendar')">Anuluj</button>` : ''}
+                    <div class="flex">
+                         <button class="btn-outline btn-block" style="flex:1" onclick="app.addSetToLastExercise()">
+                            + Dodaj serię do ostatniego
+                        </button>
+                    </div>
+                    <button class="btn-primary btn-block" style="padding: 1rem; font-size:1.1rem" onclick="app.saveWorkout()">
+                        ${isEdit ? 'Zapisz Zmiany' : 'Zakończ i Zapisz'}
+                    </button>
+                    ${isEdit ? `<button class="btn-outline btn-block" onclick="app.navigate('calendar')">Anuluj</button>` : ''}
                 </div>
             </div>
         `;
         container.innerHTML = html;
+        
+        // Przywróć wartość z dropdownu jeśli była (np. po powrocie z filtrowania)
+        if(appInstance.tempSelectedExercise) {
+            const sel = document.getElementById('exercise-select');
+            if(sel) sel.value = appInstance.tempSelectedExercise;
+        }
+    },
+
+    getExerciseOptions(appInstance) {
+        const exercisesList = store.exercises.sort((a,b) => a.name.localeCompare(b.name));
+        const filtered = appInstance.activeMuscleFilter === 'wszystkie' 
+            ? exercisesList 
+            : exercisesList.filter(e => e.muscleGroup === appInstance.activeMuscleFilter);
+            
+        return filtered.map(e => `<option value="${e.id}">${e.name} (${e.muscleGroup})</option>`).join('');
+    },
+
+    // Nowa funkcja tylko do aktualizacji widoczności opcji (bez re-renderowania całego formu)
+    updateExerciseDropdownVisibility(query) {
+        const select = document.getElementById('exercise-select');
+        if (!select) return;
+        
+        const options = select.options;
+        const lowerQuery = query.toLowerCase();
+
+        for (let i = 1; i < options.length; i++) { // Start od 1, żeby ominąć "-- Wybierz --"
+            const text = options[i].text.toLowerCase();
+            // Proste filtrowanie: jeśli tekst pasuje, pokazujemy
+            options[i].style.display = text.includes(lowerQuery) ? '' : 'none';
+        }
     },
 
     renderSessionRows(appInstance) {
         if(appInstance.tempSets.length === 0) {
-            return '<div style="text-align:center; padding: 2rem; color:var(--text-light); background:var(--bg); border-radius:var(--radius); border: 2px dashed var(--border);">Brak dodanych ćwiczeń.<br>Użyj wyszukiwarki i listy powyżej, aby dodać pierwsze ćwiczenie.</div>';
+            return '<div style="text-align:center; color:var(--text-light); padding:2rem; background:var(--surface); border-radius:var(--radius); border:1px dashed var(--border)">Brak dodanych ćwiczeń.<br>Użyj wyszukiwarki na górze, aby dodać pierwsze ćwiczenie.</div>';
         }
         
-        return appInstance.tempSets.map((item, exIndex) => `
-            <div class="card" style="padding:1rem; margin-bottom:1rem; border-left: 4px solid var(--primary);">
-                <div class="flex flex-between" style="margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
-                    <strong style="font-size:1.1rem;">${utils.getExerciseName(store.exercises, item.exerciseId)}</strong>
-                    <button class="btn-danger btn-sm" onclick="app.removeSessionItem(${exIndex})">Usuń ćwiczenie</button>
+        return appInstance.tempSets.map((item, index) => `
+            <div class="exercise-card">
+                <div class="exercise-header">
+                    <span>${index + 1}. ${utils.getExerciseName(store.exercises, item.exerciseId)}</span>
+                    <button class="btn-danger btn-sm" onclick="app.removeSessionItem(${index})">Usuń ćw.</button>
                 </div>
-                
-                ${item.sets.map((s, setIndex) => `
-                    <div class="set-row" style="background: var(--bg); padding: 0.5rem; border-radius: var(--radius); margin-bottom: 0.5rem;">
-                        <div style="grid-column: 1 / -1; font-size: 0.8rem; font-weight: bold; color: var(--primary); margin-bottom: 0.25rem;">
-                            SERIA ${setIndex + 1}
+                <div style="display:grid; grid-template-columns: 0.5fr 1fr 1fr auto; gap:0.5rem; margin-bottom:0.5rem; font-size:0.75rem; color:var(--text-light); text-align:center;">
+                    <div>#</div><div>Kg</div><div>Rep</div><div>Note</div>
+                </div>
+                ${item.sets.map((s, sIdx) => `
+                    <div class="set-row">
+                        <div class="set-number">${sIdx + 1}</div>
+                        <div class="set-input-group">
+                            <input type="number" step="0.5" inputmode="decimal" placeholder="0" value="${s.weight}" oninput="app.updateSet(${index}, ${sIdx}, 'weight', this.value)">
                         </div>
-                        
-                        <div>
-                            <span class="set-label">Ciężar (kg)</span>
-                            <input type="number" step="0.5" min="0" placeholder="0" value="${s.weight}" 
-                                   oninput="app.updateSet(${exIndex}, ${setIndex}, 'weight', this.value)">
+                        <div class="set-input-group">
+                            <input type="number" step="1" inputmode="numeric" placeholder="0" value="${s.reps}" oninput="app.updateSet(${index}, ${sIdx}, 'reps', this.value)">
                         </div>
-                        <div>
-                            <span class="set-label">Powtórzenia</span>
-                            <input type="number" step="1" min="0" placeholder="0" value="${s.reps}" 
-                                   oninput="app.updateSet(${exIndex}, ${setIndex}, 'reps', this.value)">
-                        </div>
-                        <div style="grid-column: 1 / -1;">
-                            <span class="set-label">Notatka (opcjonalnie)</span>
-                            <input type="text" placeholder="Np. pauza, ból barku..." value="${s.notes || ''}" 
-                                   oninput="app.updateSet(${exIndex}, ${setIndex}, 'notes', this.value)">
+                        <div class="set-input-group" style="grid-column: span 1">
+                             <input type="text" placeholder="Notatka" value="${s.notes || ''}" oninput="app.updateSet(${index}, ${sIdx}, 'notes', this.value)" style="margin-bottom:0">
                         </div>
                     </div>
                 `).join('')}
-                
-                <button class="btn-outline" style="width:100%; margin-top:0.5rem;" onclick="app.addSetToExercise(${exIndex})">
-                    + Dodaj kolejną serię
-                </button>
             </div>
         `).join('');
     },
@@ -242,7 +260,7 @@ export const ui = {
                 
                 <div class="card">
                     <h3>Top Partie (Objętość)</h3>
-                    ${sortedMuscles.length === 0 ? '<p>Brak danych w tym miesiącu.</p>' : ''}
+                    ${sortedMuscles.length === 0 ? '<p>Brak danych</p>' : ''}
                     <ul class="top-list" style="list-style:none">
                         ${sortedMuscles.slice(0, 5).map(([m, v]) => `
                             <li>
@@ -272,7 +290,7 @@ export const ui = {
 
             <div class="card settings-group">
                 <h2>Dane</h2>
-                <div class="flex" style="margin-bottom:1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="flex" style="margin-bottom:1rem">
                     <button class="btn-primary" onclick="app.exportData()">Eksportuj JSON</button>
                     <div class="file-input-wrapper">
                         <button class="btn-outline">Importuj JSON</button>
