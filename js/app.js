@@ -195,16 +195,51 @@ const app = {
     },
 
     updateSet(exIdx, setIdx, field, value) {
-        // Walidacja
+        // ✅ Walidacja dla weight
         if (field === 'weight') {
-            // Dozwolone liczby i kropka/przecinek
-            if (value !== '' && isNaN(parseFloat(value.replace(',', '.')))) return;
-        } else if (field === 'reps') {
-            // Tylko liczby całkowite
-            if (value !== '' && !Number.isInteger(parseInt(value))) return;
+            if (value === '') {
+                this.tempSets[exIdx].sets[setIdx][field] = '';
+                return;
+            }
+            
+            const num = parseFloat(value.replace(',', '.'));
+            
+            // Sprawdzenia
+            if (isNaN(num)) return; // Nie liczba
+            if (num < 0) return;    // Liczba ujemna
+            if (num > 999) return;  // Za duża
+            if (!isFinite(num)) return; // Infinity, NaN
+            
+            // Limit na 1 miejsce po przecinku (0.5kg step)
+            this.tempSets[exIdx].sets[setIdx][field] = Math.round(num * 2) / 2;
+            
+        } 
+        // ✅ Walidacja dla reps
+        else if (field === 'reps') {
+            if (value === '') {
+                this.tempSets[exIdx].sets[setIdx][field] = '';
+                return;
+            }
+            
+            const num = parseInt(value, 10);
+            
+            // Sprawdzenia
+            if (isNaN(num)) return;      // Nie liczba
+            if (num < 1) return;         // Mniejsza niż 1
+            if (num > 999) return;       // Za dużo powtórzeń
+            if (!Number.isInteger(num)) return; // Nie całkowita
+            
+            this.tempSets[exIdx].sets[setIdx][field] = num;
+            
+        } 
+        // ✅ Walidacja dla notes
+        else if (field === 'notes') {
+            // Limit 500 znaków
+            if (value.length > 500) return;
+            
+            // Bezpieczne zapisanie
+            this.tempSets[exIdx].sets[setIdx][field] = value;
         }
-        
-        this.tempSets[exIdx].sets[setIdx][field] = value;
     },
 
     saveWorkout() {
@@ -213,21 +248,48 @@ const app = {
             return;
         }
 
-        const cleanExercises = this.tempSets.map(ex => ({
-            exerciseId: ex.exerciseId,
-            isCardio: ex.isCardio,
-            sets: ex.sets.filter(s => s.reps !== '' || s.weight !== '').map(s => ({
-                weight: parseFloat(s.weight.replace(',', '.')) || 0,
-                reps: parseInt(s.reps) || 0,
-                notes: s.notes
-            }))
-        })).filter(ex => ex.sets.length > 0);
+        // ✅ Walidacja każdego ćwiczenia i serii
+        let hasValidSets = false;
+        
+        const cleanExercises = this.tempSets.map(ex => {
+            const validSets = ex.sets.filter(s => {
+                const weight = s.weight ? parseFloat(String(s.weight).replace(',', '.')) : 0;
+                const reps = s.reps ? parseInt(String(s.reps), 10) : 0;
+                
+                // ✅ Obie wartości muszą być > 0
+                if (weight > 0 && reps > 0) {
+                    hasValidSets = true;
+                    return true;
+                }
+                return false;
+            }).map(s => {
+                const weight = parseFloat(String(s.weight).replace(',', '.')) || 0;
+                const reps = parseInt(String(s.reps), 10) || 0;
+                
+                // ✅ Dodatkowa walidacja
+                if (weight < 0 || weight > 999) return null;
+                if (reps < 1 || reps > 999) return null;
+                
+                return {
+                    weight: Math.round(weight * 2) / 2,
+                    reps: reps,
+                    notes: (s.notes || '').substring(0, 500) // Max 500 znaków
+                };
+            }).filter(s => s !== null);
+            
+            return {
+                exerciseId: ex.exerciseId,
+                isCardio: ex.isCardio || false,
+                sets: validSets
+            };
+        }).filter(ex => ex.sets.length > 0);
 
-        if(cleanExercises.length === 0) {
-            utils.showToast('Wypełnij dane serii!', 'error');
+        if (!hasValidSets || cleanExercises.length === 0) {
+            utils.showToast('Wypełnij przynajmniej jedno ćwiczenie z danymi!', 'error');
             return;
         }
 
+        // ✅ Reszta bez zmian
         if (this.editModeId) {
             const existingLog = store.getLog(this.editModeId);
             if(existingLog) {
