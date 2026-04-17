@@ -1,11 +1,29 @@
 export const utils = {
+    /**
+     * Bezpieczne wyświetlanie tekstu (ochrona przed XSS)
+     * Zamienia znaki specjalne na encje HTML
+     */
+    escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const str = String(text);
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    },
+
+    /**
+     * Wyświetla powiadomienie (Toast)
+     */
     showToast(message, type = 'success') {
         const container = document.getElementById('toast-container');
         if (!container) return;
         
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        // Sanitization: usuwamy potencjalne tagi HTML z wiadomości
+        // Używamy escapeHtml dla bezpieczeństwa wiadomości
         toast.textContent = message;
         
         container.appendChild(toast);
@@ -18,9 +36,11 @@ export const utils = {
         }, 3000);
     },
 
+    /**
+     * Walidacja liczb
+     */
     validateNumber(value, allowDecimals = false) {
         if (value === '') return '';
-        // Zamiana przecinka na kropkę dla spójności
         const normalized = value.replace(',', '.');
         const num = parseFloat(normalized);
         
@@ -32,12 +52,17 @@ export const utils = {
         return normalized;
     },
 
+    /**
+     * Pobieranie nazwy ćwiczenia
+     */
     getExerciseName(exercises, id) {
         const ex = exercises.find(e => e.id === id);
         return ex ? ex.name : 'Nieznane';
     },
     
-    // Bezpieczne parsowanie JSON z obsługą błędów
+    /**
+     * Bezpieczne parsowanie JSON
+     */
     safeJSONParse(str, fallback) {
         try {
             return JSON.parse(str);
