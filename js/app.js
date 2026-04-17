@@ -23,24 +23,30 @@ const app = {
 
     navigate(view) {
         this.currentView = view;
+        
+        // Bezpieczne usuwanie klasy active
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
         const navBtn = document.getElementById(`nav-${view}`);
         if(navBtn) navBtn.classList.add('active');
         
         const container = document.getElementById('app');
-        if(container) container.innerHTML = ''; 
-
-        if (view === 'calendar') ui.renderCalendar(container, this);
-        if (view === 'log') ui.renderLogForm(container, this);
-        if (view === 'stats') ui.renderStats(container);
-        if (view === 'settings') ui.renderSettings(container);
+        if(container) {
+            container.innerHTML = ''; 
+            if (view === 'calendar') ui.renderCalendar(container, this);
+            if (view === 'log') ui.renderLogForm(container, this);
+            if (view === 'stats') ui.renderStats(container);
+            if (view === 'settings') ui.renderSettings(container);
+        }
     },
 
     render() {
-        if (this.currentView === 'calendar') ui.renderCalendar(document.getElementById('app'), this);
-        if (this.currentView === 'log') ui.renderLogForm(document.getElementById('app'), this);
-        if (this.currentView === 'stats') ui.renderStats(document.getElementById('app'));
-        if (this.currentView === 'settings') ui.renderSettings(document.getElementById('app'));
+        const container = document.getElementById('app');
+        if (!container) return;
+
+        if (this.currentView === 'calendar') ui.renderCalendar(container, this);
+        if (this.currentView === 'log') ui.renderLogForm(container, this);
+        if (this.currentView === 'stats') ui.renderStats(container);
+        if (this.currentView === 'settings') ui.renderSettings(container);
     },
 
     changeMonth(delta) {
@@ -269,7 +275,14 @@ const app = {
     }
 };
 
-// Rejestracja Service Workera (PWA)
+// ==========================================
+// KLUCZOWA POPRAWKA: Wystawienie app do window
+// ==========================================
+if (typeof window !== 'undefined') {
+    window.app = app;
+}
+
+// Rejestracja Service Workera
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('../sw.js')
@@ -278,5 +291,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-window.app = app;
+// Start aplikacji
 app.init();
