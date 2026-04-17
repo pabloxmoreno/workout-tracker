@@ -12,6 +12,7 @@ const app = {
     tempSets: [], 
     editModeId: null,
     
+    // Stan modala
     isModalOpen: false,
     modalFilter: 'wszystkie',
     modalSearchQuery: '',
@@ -24,19 +25,19 @@ const app = {
     navigate(view) {
         this.currentView = view;
         
-        // Bezpieczne usuwanie klasy active
+        // Aktualizacja nawigacji
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-        const navBtn = document.getElementById(`nav-${view}`);
-        if(navBtn) navBtn.classList.add('active');
+        const activeBtn = document.getElementById(`nav-${view}`);
+        if(activeBtn) activeBtn.classList.add('active');
         
         const container = document.getElementById('app');
-        if(container) {
-            container.innerHTML = ''; 
-            if (view === 'calendar') ui.renderCalendar(container, this);
-            if (view === 'log') ui.renderLogForm(container, this);
-            if (view === 'stats') ui.renderStats(container);
-            if (view === 'settings') ui.renderSettings(container);
-        }
+        if (!container) return;
+        container.innerHTML = ''; 
+
+        if (view === 'calendar') ui.renderCalendar(container, this);
+        if (view === 'log') ui.renderLogForm(container, this);
+        if (view === 'stats') ui.renderStats(container);
+        if (view === 'settings') ui.renderSettings(container);
     },
 
     render() {
@@ -95,6 +96,8 @@ const app = {
         
         this.navigate('log');
     },
+
+    // --- LOGIKA MODALA ---
 
     openExerciseModal() {
         this.isModalOpen = true;
@@ -166,6 +169,8 @@ const app = {
             if(btn) btn.disabled = false;
         }, 100);
     },
+
+    // --- AKCJE FORMULARZA ---
 
     addSetToLastExercise() {
         if (this.tempSets.length === 0) return;
@@ -276,20 +281,13 @@ const app = {
 };
 
 // ==========================================
-// KLUCZOWA POPRAWKA: Wystawienie app do window
+// KLUCZOWA POPRAWKA: Wystawienie app do globalnego okna
 // ==========================================
-if (typeof window !== 'undefined') {
-    window.app = app;
-}
+window.app = app;
 
-// Rejestracja Service Workera
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('../sw.js')
-      .then(reg => console.log('SW zarejestrowany:', reg.scope))
-      .catch(err => console.log('Błąd SW:', err));
-  });
+// Inicjalizacja po załadowaniu strony
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => app.init());
+} else {
+    app.init();
 }
-
-// Start aplikacji
-app.init();
