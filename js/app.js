@@ -12,7 +12,6 @@ const app = {
     tempSets: [], 
     editModeId: null,
     
-    // Stan modala
     isModalOpen: false,
     modalFilter: 'wszystkie',
     modalSearchQuery: '',
@@ -24,15 +23,12 @@ const app = {
 
     navigate(view) {
         this.currentView = view;
-        
-        // Aktualizacja nawigacji
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-        const activeBtn = document.getElementById(`nav-${view}`);
-        if(activeBtn) activeBtn.classList.add('active');
+        const navBtn = document.getElementById(`nav-${view}`);
+        if(navBtn) navBtn.classList.add('active');
         
         const container = document.getElementById('app');
-        if (!container) return;
-        container.innerHTML = ''; 
+        if(container) container.innerHTML = ''; 
 
         if (view === 'calendar') ui.renderCalendar(container, this);
         if (view === 'log') ui.renderLogForm(container, this);
@@ -41,13 +37,10 @@ const app = {
     },
 
     render() {
-        const container = document.getElementById('app');
-        if (!container) return;
-
-        if (this.currentView === 'calendar') ui.renderCalendar(container, this);
-        if (this.currentView === 'log') ui.renderLogForm(container, this);
-        if (this.currentView === 'stats') ui.renderStats(container);
-        if (this.currentView === 'settings') ui.renderSettings(container);
+        if (this.currentView === 'calendar') ui.renderCalendar(document.getElementById('app'), this);
+        if (this.currentView === 'log') ui.renderLogForm(document.getElementById('app'), this);
+        if (this.currentView === 'stats') ui.renderStats(document.getElementById('app'));
+        if (this.currentView === 'settings') ui.renderSettings(document.getElementById('app'));
     },
 
     changeMonth(delta) {
@@ -96,8 +89,6 @@ const app = {
         
         this.navigate('log');
     },
-
-    // --- LOGIKA MODALA ---
 
     openExerciseModal() {
         this.isModalOpen = true;
@@ -169,8 +160,6 @@ const app = {
             if(btn) btn.disabled = false;
         }, 100);
     },
-
-    // --- AKCJE FORMULARZA ---
 
     addSetToLastExercise() {
         if (this.tempSets.length === 0) return;
@@ -281,13 +270,20 @@ const app = {
 };
 
 // ==========================================
-// KLUCZOWA POPRAWKA: Wystawienie app do globalnego okna
+// SERVICE WORKER ZAKOMENTOWANY (TYMCZASOWO WYŁĄCZONY)
+// Aby przywrócić funkcję offline, odkomentuj poniższy blok
+// i upewnij się, że plik sw.js istnieje i jest poprawny.
 // ==========================================
-window.app = app;
-
-// Inicjalizacja po załadowaniu strony
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => app.init());
-} else {
-    app.init();
+/*
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('../sw.js')
+      .then(reg => console.log('SW zarejestrowany:', reg.scope))
+      .catch(err => console.log('Błąd SW:', err));
+  });
 }
+*/
+
+// Kluczowe dla działania przycisków w HTML (onclick="app...")
+window.app = app;
+app.init();
