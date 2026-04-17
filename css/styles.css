@@ -254,3 +254,21 @@ nav svg { width: 24px; height: 24px; fill: currentColor; }
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
 }
+
+/* --- DODATEK: Style dla modala potwierdzenia --- */
+#confirm-modal-overlay .modal-content {
+    text-align: center;
+    max-width: 400px;
+}
+#confirm-modal-overlay .modal-body {
+    padding: 2rem 1rem;
+}
+#confirm-modal-overlay p {
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    color: var(--text);
+}
+#confirm-modal-overlay .flex {
+    justify-content: center;
+    gap: 1rem;
+}
