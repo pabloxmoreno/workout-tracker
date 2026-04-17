@@ -1,126 +1,120 @@
-import { generateId, validateImportData, escapeHtml } from './utils.js';
+import { DEFAULT_EXERCISES } from './config.js';
+import { utils } from './utils.js';
 
-class Store {
-    constructor() {
-        this.logs = [];
-        this.settings = {
-            darkMode: false,
-            unit: 'kg'
-        };
-        this.load();
-    }
+const store = {
+    exercises: [],
+    logs: [],
+    settings: { theme: 'light' },
 
-    load() {
+    init() {
         try {
-            const logs = localStorage.getItem('workout_logs');
-            const settings = localStorage.getItem('workout_settings');
-            
-            if (logs) this.logs = JSON.parse(logs);
-            if (settings) this.settings = JSON.parse(settings);
+            const storedEx = localStorage.getItem('wt_exercises');
+            const storedLogs = localStorage.getItem('wt_logs');
+            const storedSettings = localStorage.getItem('wt_settings');
+
+            this.exercises = storedEx ? utils.safeJSONParse(storedEx, [...DEFAULT_EXERCISES]) : [...DEFAULT_EXERCISES];
+            this.logs = storedLogs ? utils.safeJSONParse(storedLogs, []) : [];
+            this.settings = storedSettings ? utils.safeJSONParse(storedSettings, { theme: 'light' }) : { theme: 'light' };
+
+            if (!storedEx) this.save();
+            this.applyTheme();
         } catch (e) {
-            console.error('Błąd ładowania danych:', e);
+            console.error('Błąd inicjalizacji store:', e);
+            this.exercises = [...DEFAULT_EXERCISES];
             this.logs = [];
         }
-    }
+    },
 
     save() {
-        localStorage.setItem('workout_logs', JSON.stringify(this.logs));
-        localStorage.setItem('workout_settings', JSON.stringify(this.settings));
-    }
+        try {
+            localStorage.setItem('wt_exercises', JSON.stringify(this.exercises));
+            localStorage.setItem('wt_logs', JSON.stringify(this.logs));
+            localStorage.setItem('wt_settings', JSON.stringify(this.settings));
+        } catch (e) {
+            console.error('Błąd zapisu localStorage (może być pełny):', e);
+            alert('Błąd zapisu! Pamięć urządzenia może być pełna.');
+        }
+    },
 
     addLog(logEntry) {
-        // Sanitizacja danych przed zapisem (dodatkowa warstwa ochrony)
-        const safeEntry = {
-            ...logEntry,
-            id: logEntry.id || generateId(),
-            exercises: logEntry.exercises.map(ex => ({
-                ...ex,
-                name: escapeHtml(ex.name),
-                notes: ex.notes ? escapeHtml(ex.notes) : ''
-            }))
-        };
-        
-        this.logs.push(safeEntry);
+        this.logs.push(logEntry);
         this.save();
-        return safeEntry;
-    }
+    },
 
-    updateLog(id, updates) {
-        const index = this.logs.findIndex(l => l.id === id);
+    updateLog(updatedLog) {
+        const index = this.logs.findIndex(l => l.id === updatedLog.id);
         if (index !== -1) {
-            // Sanitizacja aktualizowanych danych
-            const safeUpdates = { ...updates };
-            if (safeUpdates.notes) safeUpdates.notes = escapeHtml(safeUpdates.notes);
-            
-            this.logs[index] = { ...this.logs[index], ...safeUpdates };
+            this.logs[index] = updatedLog;
             this.save();
+            return true;
         }
-    }
+        return false;
+    },
 
-    deleteLog(id) {
-        this.logs = this.logs.filter(l => l.id !== id);
+    getLog(id) {
+        return this.logs.find(l => l.id === id);
+    },
+
+    deleteLog(logId) {
+        this.logs = this.logs.filter(l => l.id !== logId);
         this.save();
-    }
+    },
 
-    getLogsByDate(date) {
-        return this.logs.filter(l => l.date === date);
-    }
+    addCustomExercise(name, group) {
+        const newId = 'c_' + Date.now();
+        this.exercises.push({ id: newId, name, muscleGroup: group, isCustom: true });
+        this.save();
+        return newId;
+    },
 
-    getAllLogs() {
-        return this.logs.sort((a, b) => new Date(b.date) - new Date(a.date));
-    }
+    applyTheme() {
+        document.documentElement.setAttribute('data-theme', this.settings.theme);
+    },
+
+    toggleTheme() {
+        this.settings.theme = this.settings.theme === 'light' ? 'dark' : 'light';
+        this.applyTheme();
+        this.save();
+    },
 
     exportData() {
-        return JSON.stringify({
-            version: '1.0',
-            exportDate: new Date().toISOString(),
+        const dataStr = "text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+            exercises: this.exercises,
             logs: this.logs,
             settings: this.settings
-        }, null, 2);
-    }
+        }));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "workout_backup_" + new Date().toISOString().slice(0,10) + ".json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    },
 
     importData(jsonString) {
         try {
             const data = JSON.parse(jsonString);
-            
-            if (!validateImportData(data)) {
-                throw new Error('Nieprawidłowy format danych');
+            if(data.exercises && Array.isArray(data.exercises) && data.logs && Array.isArray(data.logs)) {
+                this.exercises = data.exercises;
+                this.logs = data.logs;
+                if(data.settings) this.settings = data.settings;
+                this.save();
+                location.reload();
+            } else {
+                throw new Error('Nieprawidłowa struktura danych');
             }
-
-            // Sanitizacja wszystkich importowanych danych
-            const safeLogs = data.logs.map(log => ({
-                ...log,
-                id: escapeHtml(String(log.id)),
-                date: String(log.date), // Prosta walidacja daty
-                exercises: log.exercises.map(ex => ({
-                    id: escapeHtml(String(ex.id)),
-                    name: escapeHtml(String(ex.name)),
-                    muscleGroup: ex.muscleGroup ? escapeHtml(String(ex.muscleGroup)) : '',
-                    sets: Array.isArray(ex.sets) ? ex.sets : [],
-                    notes: ex.notes ? escapeHtml(String(ex.notes)) : ''
-                })),
-                notes: log.notes ? escapeHtml(String(log.notes)) : ''
-            }));
-
-            this.logs = [...this.logs, ...safeLogs];
-            this.save();
-            return true;
         } catch (e) {
-            console.error('Błąd importu:', e);
-            throw e;
+            alert('Błąd importu: Nieprawidłowy plik lub uszkodzone dane.');
+            console.error(e);
+        }
+    },
+    
+    resetData() {
+        if(confirm('TO USUNIE WSZYSTKIE DANE. Czy na pewno?')) {
+            localStorage.clear();
+            location.reload();
         }
     }
+};
 
-    resetData() {
-        this.logs = [];
-        this.save();
-    }
-
-    toggleDarkMode() {
-        this.settings.darkMode = !this.settings.darkMode;
-        this.save();
-        return this.settings.darkMode;
-    }
-}
-
-export default new Store();
+export default store;
