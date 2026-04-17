@@ -44,3 +44,27 @@ export const DEFAULT_EXERCISES = [
 ];
 
 export const MUSCLE_GROUPS = ['wszystkie', 'klatka', 'plecy', 'nogi', 'barki', 'biceps', 'triceps', 'core', 'posladki', 'cardio', 'mobilnosc'];
+
+// Przykładowe domyślne rutyny
+export const DEFAULT_ROUTINES = [
+    {
+        id: 'r_fbwa',
+        name: 'FBW A (Siła)',
+        exercises: [
+            { exerciseId: 'e11', sets: 3 }, // Przysiad
+            { exerciseId: 'e1', sets: 3 },  // Wyciskanie leżąc
+            { exerciseId: 'e8', sets: 3 }   // Wiosłowanie
+        ]
+    },
+    {
+        id: 'r_fbwb',
+        name: 'FBW B (Hipertrofia)',
+        exercises: [
+            { exerciseId: 'e12', sets: 3 }, // Suwnica
+            { exerciseId: 'e17', sets: 3 }, // Żołnierskie
+            { exerciseId: 'e6', sets: 3 },  // Podciąganie
+            { exerciseId: 'e22', sets: 3 }, // Biceps
+            { exerciseId: 'e26', sets: 3 }  // Triceps
+        ]
+    }
+];
