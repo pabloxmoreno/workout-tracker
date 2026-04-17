@@ -1,42 +1,24 @@
-# 💪 Workout Tracker Pro
+# Workout Tracker Pro
 
-Lekka, szybka i w pełni responsywna aplikacja do monitorowania treningów siłowych i cardio. Działa całkowicie w przeglądarce, nie wymaga serwera backendowego ani baz danych – wszystkie dane są przechowywane lokalnie w urządzeniu użytkownika (`localStorage`).
+Lekka aplikacja PWA do zapisywania treningów. Działa offline. Dane są przechowywane lokalnie w przeglądarce i nie opuszczają urządzenia.
 
-Gotowa do wdrożenia na **GitHub Pages** jako statyczna strona WWW.
+## Funkcje
+- 📋 **Rutyny treningowe** – tworzenie, edycja, szybkie ładowanie planów.
+- 📅 **Kalendarz** – historia treningów z podglądem miesięcznym.
+- 📊 **Statystyki** – objętość treningowa (volume) i rozkład na partie mięśniowe.
+- 🌙 **Tryb ciemny/jasny** – przełączanie motywów.
+- 💾 **Eksport/Import** – kopie zapasowe danych w formacie JSON.
+- 🔍 **Wyszukiwarka** – baza ćwiczeń z filtrowaniem i opcją dodawania własnych.
 
-## ✨ Funkcje
+## Instalacja (PWA)
+Aplikację można zainstalować na telefonie jako ikonę na ekranie głównym:
 
-- 📅 **Kalendarz Treningów**: Przeglądaj historię ćwiczeń miesiąc po miesiącu. Dni z treningiem są podświetlone.
-- 📝 **Logowanie Sesji**: Dodawaj ćwiczenia, serie, ciężary (kg) i powtórzenia. Możliwość dodawania notatek.
-- 📊 **Statystyki**: Automatyczne obliczanie objętości treningowej (volume) i topowych partii mięśniowych w danym miesiącu.
-- 🎨 **Tryb Ciemny/Jasny**: Przełączaj motyw zgodnie z preferencjami.
-- 💾 **Eksport/Import Danych**: Bezpieczne kopie zapasowe w formacie JSON.
-- 📱 **Mobile First**: Zoptymalizowany interfejs dla telefonów komórkowych (czytelne etykiety pól).
-- 🔍 **Wyszukiwarka**: Szybkie filtrowanie ćwiczeń z wbudowanej bazy (>40 ćwiczeń) lub dodawanie własnych.
+- **iOS (Safari):** Kliknij przycisk Udostępnij → wybierz "Dodaj do ekranu początkowego".
+- **Android (Chrome):** Kliknij menu (trzy kropki) → wybierz "Zainstaluj aplikację" lub "Dodaj do ekranu głównego".
 
-## 🚀 Wdrożenie (GitHub Pages)
+Po instalacji aplikacja działa w trybie pełnoekranowym i jest dostępna bez połączenia z internetem.
 
-Aplikacja jest gotowa do działania natychmiast po wrzuceniu na GitHub.
-
-1. Utwórz nowe repozytorium na GitHub.
-2. Wrzuć pliki projektu (zachowując strukturę folderów `css` i `js`).
-3. Wejdź w **Settings** -> **Pages**.
-4. W sekcji **Build and deployment** wybierz:
-   - Source: `Deploy from a branch`
-   - Branch: `main` (lub `master`)
-   - Folder: `/ (root)`
-5. Kliknij **Save**. Po chwili otrzymasz link do działającej aplikacji.
-
-## 🛠 Struktura Projektu
-
-```text
-/
-├── index.html          # Główny plik HTML
-├── css/
-│   └── styles.css      # Arkusze stylów (zmienne CSS, responsywność)
-└── js/
-    ├── app.js          # Główna logika aplikacji i nawigacja
-    ├── config.js       # Baza danych ćwiczeń i grup mięśniowych
-    ├── store.js        # Zarządzanie localStorage (CRUD)
-    ├── ui.js           # Komponenty renderujące widoki
-    └── utils.js        # Funkcje pomocnicze (walidacja, powiadomienia)
+## Uwagi dotyczące bezpieczeństwa i danych
+- **Brak szyfrowania:** Dane są zapisywane jako zwykły tekst. Każdy mający fizyczny dostęp do odblokowanego urządzenia może je podejrzeć.
+- **Lokalność:** Dane nie są wysyłane na żadne serwery zewnętrzne.
+- **Kopie zapasowe:** Regularnie używaj funkcji **Eksportuj JSON** w ustawieniach. Wyczyszczenie danych przeglądarki lub odinstalowanie aplikacji skutkuje trwałą utratą wszystkich zapisanych treningów.
