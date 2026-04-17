@@ -15,9 +15,9 @@ export const ui = {
         let html = `
             <div class="card">
                 <div class="calendar-header">
-                    <button class="btn-outline" onclick="app.changeMonth(-1)">❮</button>
+                    <button class="btn-outline" id="btn-prev-month">❮</button>
                     <h2>${new Date(year, month).toLocaleString('pl-PL', { month: 'long', year: 'numeric' })}</h2>
-                    <button class="btn-outline" onclick="app.changeMonth(1)">❯</button>
+                    <button class="btn-outline" id="btn-next-month">❯</button>
                 </div>
                 <div class="calendar-grid">
                     <div class="cal-day-name">Pn</div><div class="cal-day-name">Wt</div><div class="cal-day-name">Śr</div>
@@ -38,7 +38,8 @@ export const ui = {
             if(hasWorkout) classes += ' has-workout';
             if(isSelected) classes += ' selected';
 
-            html += `<div class="${classes}" onclick="app.selectDate('${currentStr}')">${d}</div>`;
+            // Dodajemy atrybut data-date
+            html += `<div class="${classes}" data-date="${currentStr}">${d}</div>`;
         }
 
         html += `</div>`; 
@@ -47,7 +48,7 @@ export const ui = {
         html += `<div class="workout-preview">
             <div class="flex flex-between">
                 <h3>Trening: ${appInstance.selectedDate}</h3>
-                <button class="btn-primary" onclick="app.prepLogForDate('${appInstance.selectedDate}', false)">+ Dodaj trening</button>
+                <button class="btn-primary" id="btn-add-training">+ Dodaj trening</button>
             </div>`;
         
         if(dayLogs.length > 0) {
@@ -76,13 +77,14 @@ export const ui = {
                 });
                 detailsHtml += `
                     <div class="flex" style="margin-top:1rem">
-                        <button class="btn-primary btn-sm" onclick="app.prepLogForDate('${log.date}', '${log.id}')">Edytuj</button>
-                        <button class="btn-danger btn-sm" onclick="app.deleteLog('${log.id}')">Usuń</button>
+                        <button class="btn-primary btn-sm btn-edit-log" data-id="${log.id}" data-date="${log.date}">Edytuj</button>
+                        <button class="btn-danger btn-sm btn-delete-log" data-id="${log.id}">Usuń</button>
                     </div>
                 </div>`;
 
+                // Dodajemy atrybut data-log-id
                 html += `
-                    <div class="workout-summary-item" onclick="app.toggleDetails('${log.id}')">
+                    <div class="workout-summary-item" data-log-id="${log.id}">
                         <div class="flex flex-between">
                             <strong>${Math.round(vol)} kg</strong>
                             <small>${timeStr}</small>
@@ -109,9 +111,9 @@ export const ui = {
                 <div class="log-header card" style="margin-bottom:0; border-radius:0; box-shadow:none; background:transparent; padding:0;">
                     <h2>${title}</h2>
                     <label>Data</label>
-                    <input type="date" value="${appInstance.selectedDate}" onchange="app.selectedDate = this.value" style="margin-bottom:0.5rem">
+                    <input type="date" id="workout-date" value="${appInstance.selectedDate}" style="margin-bottom:0.5rem">
                     
-                    <button class="btn-primary btn-block" onclick="app.openExerciseModal()">
+                    <button class="btn-primary btn-block" id="btn-open-modal">
                         + Wybierz ćwiczenie
                     </button>
                 </div>
@@ -121,30 +123,29 @@ export const ui = {
                 </div>
 
                 <div class="log-footer card" style="margin-top:0; border-radius:0; box-shadow:none; background:transparent; padding:0;">
-                    <button class="btn-outline btn-block" onclick="app.addSetToLastExercise()" id="btn-add-set" disabled>
+                    <button class="btn-outline btn-block" id="btn-add-set" disabled>
                         + Dodaj serię do ostatniego
                     </button>
-                    <button class="btn-primary btn-block" onclick="app.saveWorkout()">
+                    <button class="btn-primary btn-block" id="btn-save-workout">
                         ${isEdit ? 'Zapisz Zmiany' : 'Zakończ i Zapisz'}
                     </button>
-                    ${isEdit ? `<button class="btn-outline btn-block" style="margin-top:0.5rem" onclick="app.navigate('calendar')">Anuluj</button>` : ''}
+                    ${isEdit ? `<button class="btn-outline btn-block" style="margin-top:0.5rem" id="btn-cancel-edit">Anuluj</button>` : ''}
                 </div>
             </div>
 
             <!-- MODAL -->
-            <div id="exercise-modal" class="modal-overlay hidden" onclick="if(event.target === this) app.closeExerciseModal()">
+            <div id="exercise-modal" class="modal-overlay hidden">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3>Wybierz ćwiczenie</h3>
-                        <button class="btn-outline btn-sm" onclick="app.closeExerciseModal()">✕</button>
+                        <button class="btn-outline btn-sm" id="btn-close-modal">✕</button>
                     </div>
                     <div class="modal-body">
-                        <input type="text" id="modal-search" placeholder="Szukaj ćwiczenia..." oninput="app.filterModalExercises()" autocomplete="off">
+                        <input type="text" id="modal-search" placeholder="Szukaj ćwiczenia..." autocomplete="off">
                         
                         <div class="muscle-filter" id="modal-filters">
                             ${MUSCLE_GROUPS.map(g => `
-                                <button class="chip ${appInstance.modalFilter === g ? 'active' : ''}" 
-                                        onclick="app.setModalFilter('${g}')">
+                                <button class="chip ${appInstance.modalFilter === g ? 'active' : ''}" data-group="${g}">
                                     ${g.charAt(0).toUpperCase() + g.slice(1)}
                                 </button>
                             `).join('')}
@@ -174,22 +175,25 @@ export const ui = {
             <div class="card" style="padding:1rem; margin-bottom:1rem;">
                 <div class="flex flex-between" style="margin-bottom:0.5rem; border-bottom:1px solid var(--border); padding-bottom:0.5rem;">
                     <strong style="color:var(--primary)">${utils.getExerciseName(store.exercises, item.exerciseId)}</strong>
-                    <button class="btn-danger btn-sm" onclick="app.removeSessionItem(${exIndex})">Usuń ćw.</button>
+                    <button class="btn-danger btn-sm btn-remove-ex" data-idx="${exIndex}">Usuń ćw.</button>
                 </div>
                 ${item.sets.map((s, sIdx) => `
                     <div class="set-row">
                         <div class="set-number">Seria ${sIdx + 1}</div>
                         <div>
                             <span class="set-label">Kg</span>
-                            <input type="number" step="0.5" inputmode="decimal" placeholder="0" value="${s.weight}" oninput="app.updateSet(${exIndex}, ${sIdx}, 'weight', this.value)">
+                            <input type="number" step="0.5" inputmode="decimal" class="set-input" data-ex-idx="${exIndex}" data-set-idx="${sIdx}" data-field="weight" placeholder="0" value="${s.weight}">
                         </div>
                         <div>
                             <span class="set-label">Powt.</span>
-                            <input type="number" step="1" inputmode="numeric" placeholder="0" value="${s.reps}" oninput="app.updateSet(${exIndex}, ${sIdx}, 'reps', this.value)">
+                            <input type="number" step="1" inputmode="numeric" class="set-input" data-ex-idx="${exIndex}" data-set-idx="${sIdx}" data-field="reps" placeholder="0" value="${s.reps}">
                         </div>
-                        <div style="grid-column: 1/-1">
-                            <span class="set-label">Notatka</span>
-                            <input type="text" placeholder="np. ból, łatwo" value="${s.notes || ''}" oninput="app.updateSet(${exIndex}, ${sIdx}, 'notes', this.value)" style="margin-bottom:0">
+                        <div style="grid-column: 1/-1; display:flex; gap:0.5rem; align-items:end;">
+                            <div style="flex:1">
+                                <span class="set-label">Notatka</span>
+                                <input type="text" class="set-input" data-ex-idx="${exIndex}" data-set-idx="${sIdx}" data-field="notes" placeholder="np. ból" value="${s.notes || ''}" style="margin-bottom:0">
+                            </div>
+                            <button class="btn-danger btn-sm btn-remove-set" data-ex-idx="${exIndex}" data-set-idx="${sIdx}" style="margin-bottom:1rem">-</button>
                         </div>
                     </div>
                 `).join('')}
@@ -207,7 +211,7 @@ export const ui = {
         }
 
         listContainer.innerHTML = exercises.map(ex => `
-            <div class="exercise-list-item" onclick="app.selectExerciseFromModal('${ex.id}')">
+            <div class="exercise-list-item" data-id="${ex.id}">
                 <div style="font-weight:bold">${ex.name}</div>
                 <div style="font-size:0.8rem; color:var(--text-light)">${ex.muscleGroup}</div>
             </div>
@@ -278,20 +282,20 @@ export const ui = {
                 <h2>Wygląd</h2>
                 <div class="flex flex-between">
                     <span>Tryb Ciemny</span>
-                    <button class="btn-outline" onclick="app.toggleTheme()">Przełącz</button>
+                    <button class="btn-outline" id="btn-toggle-theme">Przełącz</button>
                 </div>
             </div>
 
             <div class="card settings-group">
                 <h2>Dane</h2>
                 <div class="flex" style="margin-bottom:1rem">
-                    <button class="btn-primary" onclick="app.exportData()">Eksportuj JSON</button>
+                    <button class="btn-primary" id="btn-export">Eksportuj JSON</button>
                     <div class="file-input-wrapper">
                         <button class="btn-outline">Importuj JSON</button>
-                        <input type="file" accept=".json" onchange="const f=new FileReader(); f.onload=(e)=>app.importData(e.target.result); f.readAsText(this.files[0])">
+                        <input type="file" id="input-import" accept=".json" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;">
                     </div>
                 </div>
-                <button class="btn-danger" onclick="app.resetData()">Reset Wszystkich Danych</button>
+                <button class="btn-danger" id="btn-reset">Reset Wszystkich Danych</button>
             </div>
 
             <div class="card settings-group">
@@ -300,7 +304,7 @@ export const ui = {
                 <select id="new-ex-group">
                     ${MUSCLE_GROUPS.filter(g => g !== 'wszystkie').map(g => `<option value="${g}">${g}</option>`).join('')}
                 </select>
-                <button class="btn-primary" onclick="app.handleAddCustomExercise()">Dodaj</button>
+                <button class="btn-primary" id="btn-add-custom">Dodaj</button>
             </div>
         `;
         container.innerHTML = html;
